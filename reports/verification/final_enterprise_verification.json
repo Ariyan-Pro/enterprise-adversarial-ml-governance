@@ -1,0 +1,17 @@
+﻿{
+    "platform_version":  "4.0.0-enterprise",
+    "components":  {
+                       "governance_system":  true,
+                       "adversarial_intelligence":  true,
+                       "api_layer":  true,
+                       "cicd_gates":  true,
+                       "model_registry":  true,
+                       "model_firewall":  true
+                   },
+    "timestamp":  "2026-01-11 20:19:56",
+    "startup_scripts":  [
+
+                        ],
+    "total_python_files":  10022,
+    "deployment_status":  "PARTIAL"
+}

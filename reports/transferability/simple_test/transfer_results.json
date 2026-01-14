@@ -1,0 +1,17 @@
+{
+  "model": "baseline_mnist",
+  "dataset": "mnist",
+  "attacks": {
+    "fgsm_epsilon_0.3": {
+      "samples_tested": 100,
+      "successful_attacks": 8,
+      "transfer_rate": 8.0
+    },
+    "cw_fast": {
+      "samples_tested": 100,
+      "successful_attacks": 1,
+      "transfer_rate": 1.0
+    }
+  },
+  "transfer_rates": {}
+}

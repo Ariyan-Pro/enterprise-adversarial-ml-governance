@@ -1,0 +1,28 @@
+{
+  "path": "models/pretrained/mnist_cnn.pth",
+  "model_class": "MNIST_CNN",
+  "parameters": 207018,
+  "trainable_parameters": 207018,
+  "save_timestamp": "2026-01-08 18:11:49.983727",
+  "training_config": {
+    "\u00ef\u00bb\u00bfmodel": "mnist_cnn",
+    "epochs": 5,
+    "batch_size": 64,
+    "learning_rate": 0.001,
+    "optimizer": "adam",
+    "weight_decay": 0.0001,
+    "scheduler": "none",
+    "save_path": "models/pretrained/mnist_cnn.pth",
+    "device": "cpu",
+    "seed": 42,
+    "validation_split": 0.1,
+    "early_stopping_patience": 3,
+    "checkpoint_frequency": 1,
+    "log_frequency": 10,
+    "augment": false
+  },
+  "test_accuracy": 98.92,
+  "test_loss": 0.031246639649212437,
+  "training_time": 368.94504141807556,
+  "final_epoch": 5
+}

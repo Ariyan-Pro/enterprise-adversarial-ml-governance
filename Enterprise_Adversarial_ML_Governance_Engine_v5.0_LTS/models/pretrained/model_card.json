@@ -1,0 +1,24 @@
+{
+  "model_name": "mnist_cnn",
+  "architecture": "MNIST_CNN",
+  "parameters": 207018,
+  "input_shape": [
+    1,
+    28,
+    28
+  ],
+  "output_shape": [
+    10
+  ],
+  "test_accuracy": 98.92,
+  "training_time_seconds": 368.9,
+  "trained_epochs": 5,
+  "batch_size": 64,
+  "learning_rate": 0.001,
+  "optimizer": "adam",
+  "loss_function": "CrossEntropyLoss",
+  "dataset": "MNIST",
+  "training_samples": 54000,
+  "validation_samples": 6000,
+  "test_samples": 10000
+}

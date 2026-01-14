@@ -1,0 +1,33 @@
+﻿device: "cpu"
+batch_size: 64
+seed: 42
+
+evaluate_clean: true
+evaluate_attacks: true
+evaluate_defenses: true
+
+clean_samples: 1000
+attack_samples: 500
+defense_samples: 250
+
+attack_epsilons: [0.05, 0.1, 0.15, 0.2, 0.3]
+defense_attack: "fgsm_epsilon_0.15"
+
+metrics:
+  - "accuracy"
+  - "confidence"
+  - "perturbation_norm"
+  - "attack_success_rate"
+
+save_samples: true
+sample_count: 10
+generate_plots: true
+save_format: ["json", "csv"]
+output_dir: "reports/metrics/robustness"
+
+plot_style: "seaborn"
+figure_size: [12, 8]
+dpi: 150
+
+log_level: "INFO"
+log_file: "reports/logs/robustness_eval.log"

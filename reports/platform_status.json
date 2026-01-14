@@ -1,0 +1,43 @@
+{
+  "generated_at": "2026-01-11T20:34:41.177458",
+  "platform_version": "4.0.0-enterprise",
+  "integration_test": {
+    "overall_pass": false,
+    "component_status": {
+      "model_loading": false,
+      "attack_modules": false,
+      "defense_modules": false,
+      "intelligence_core": true,
+      "governance_system": false,
+      "ci_cd_gates": true
+    },
+    "passing_components": 2,
+    "total_components": 6
+  },
+  "model_registry": {
+    "model_count": 0,
+    "registry_file": "models/registry/models.json",
+    "status": "empty"
+  },
+  "governance": {
+    "risk_count": 0,
+    "control_count": 0,
+    "audit_bundles": 0
+  },
+  "security": {
+    "attack_modules": 4,
+    "defense_modules": 3,
+    "firewall_implemented": false
+  },
+  "ci_cd": {
+    "gates_configured": true,
+    "test_results_available": false
+  },
+  "recommendations": [
+    "Integration test failed. Review component failures above.",
+    "Essential component 'model_loading' failed. Platform may not function correctly.",
+    "Essential component 'governance_system' failed. Platform may not function correctly.",
+    "Model registry is empty or not properly initialized.",
+    "Risk register not found. Run governance initialization."
+  ]
+}

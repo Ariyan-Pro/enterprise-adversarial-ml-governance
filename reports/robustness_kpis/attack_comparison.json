@@ -1,0 +1,104 @@
+{
+  "model": {
+    "training_config": {
+      "\u00ef\u00bb\u00bfmodel": "mnist_cnn",
+      "epochs": 5,
+      "batch_size": 64,
+      "learning_rate": 0.001,
+      "optimizer": "adam",
+      "weight_decay": 0.0001,
+      "scheduler": "none",
+      "save_path": "models/pretrained/mnist_cnn.pth",
+      "device": "cpu",
+      "seed": 42,
+      "validation_split": 0.1,
+      "early_stopping_patience": 3,
+      "checkpoint_frequency": 1,
+      "log_frequency": 10,
+      "augment": false
+    },
+    "test_accuracy": 98.92,
+    "test_loss": 0.031246639649212437,
+    "training_time": 368.94504141807556,
+    "final_epoch": 5
+  },
+  "generation_timestamp": "2026-01-09 14:38:36.774117",
+  "attacks": {
+    "fgsm": {
+      "attack_name": "fgsm",
+      "num_samples": 1000,
+      "clean_accuracy": 99.00000095367432,
+      "adversarial_accuracy": 96.60000205039978,
+      "attack_success_rate": 3.3999979496002197,
+      "avg_l2_perturbation": 18.477930068969727,
+      "avg_linf_perturbation": 1.8201123476028442,
+      "clean_confidence": 0.9877901077270508,
+      "adversarial_confidence": 0.7365609407424927,
+      "attack_config": {
+        "epsilon": 0.3,
+        "targeted": false,
+        "clip_min": 0.0,
+        "clip_max": 1.0
+      },
+      "generation_timestamp": "2026-01-09 13:09:57.008170"
+    },
+    "pgd": {
+      "attack_name": "pgd",
+      "num_samples": 1000,
+      "clean_accuracy": 99.00000095367432,
+      "adversarial_accuracy": 94.59999799728394,
+      "attack_success_rate": 5.4000020027160645,
+      "avg_l2_perturbation": 18.51502799987793,
+      "avg_linf_perturbation": 1.8201123476028442,
+      "clean_confidence": 0.9877901077270508,
+      "adversarial_confidence": 0.6765449047088623,
+      "attack_config": {
+        "epsilon": 0.4,
+        "alpha": 0.05,
+        "steps": 20,
+        "random_start": true,
+        "targeted": false,
+        "clip_min": 0.0,
+        "clip_max": 1.0
+      },
+      "generation_timestamp": "2026-01-09 13:11:19.790152"
+    },
+    "deepfool": {
+      "attack_name": "deepfool",
+      "num_samples": 1000,
+      "clean_accuracy": 99.00000095367432,
+      "adversarial_accuracy": 98.69999885559082,
+      "attack_success_rate": 1.3000011444091797,
+      "avg_l2_perturbation": 18.965450286865234,
+      "avg_linf_perturbation": 1.9598904848098755,
+      "clean_confidence": 0.9877901077270508,
+      "adversarial_confidence": 0.7464710474014282,
+      "attack_config": {
+        "max_iter": 50,
+        "overshoot": 0.02,
+        "num_classes": 10,
+        "clip_min": 0.0,
+        "clip_max": 1.0
+      },
+      "generation_timestamp": "2026-01-09 14:38:25.773727"
+    }
+  },
+  "summary": {
+    "best_attack": {
+      "name": "pgd",
+      "adversarial_accuracy": 94.59999799728394
+    },
+    "worst_attack": {
+      "name": "deepfool",
+      "adversarial_accuracy": 98.69999885559082
+    },
+    "most_stealthy_attack": {
+      "name": "fgsm",
+      "avg_l2_perturbation": 18.477930068969727
+    },
+    "most_disruptive_attack": {
+      "name": "pgd",
+      "attack_success_rate": 5.4000020027160645
+    }
+  }
+}

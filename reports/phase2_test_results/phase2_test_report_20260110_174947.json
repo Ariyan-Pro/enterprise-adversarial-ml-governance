@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-01-10T17:49:47.944602",
+  "summary": {
+    "total_tests": 5,
+    "passed_tests": 4,
+    "success_rate": 80.0
+  },
+  "test_results": [
+    {
+      "name": "Model Loading",
+      "status": "PASS",
+      "details": "MNIST CNN model loads with forward pass"
+    },
+    {
+      "name": "Dataset System",
+      "status": "PASS",
+      "details": "2 datasets available"
+    },
+    {
+      "name": "Attack System",
+      "status": "PASS",
+      "details": "3 attacks created"
+    },
+    {
+      "name": "Defense System",
+      "status": "PASS",
+      "details": "TRADES trainer and robustness scorer available"
+    },
+    {
+      "name": "Adversarial Effectiveness",
+      "status": "WARNING",
+      "details": "Average attack success: 0.0% across 4 attacks"
+    }
+  ]
+}

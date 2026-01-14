@@ -1,0 +1,24 @@
+{
+  "inference_log": [
+    {
+      "timestamp": "2026-01-12T12:55:42.127346",
+      "request_id": "1768204542.127346",
+      "input_hash": "eaf9ccfb3340c604",
+      "prediction_confidence": 0.1077437624335289,
+      "prediction_class": 7,
+      "inference_time_ms": 0,
+      "adversarial_indicators": {
+        "low_confidence": 0.1077437624335289,
+        "input_stats": {
+          "mean": 0.0,
+          "std": 0.0,
+          "max": 0.0,
+          "min": 0.0
+        }
+      }
+    }
+  ],
+  "attack_patterns": [],
+  "threat_signatures": {},
+  "last_updated": "2026-01-12T12:55:42.185808"
+}

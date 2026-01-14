@@ -1,0 +1,6 @@
+thresholds:
+  adversarial_robustness: 0.85
+  clean_accuracy: 0.95
+  confidence_calibration: 0.9
+  minimum_passing_gates: 4
+  transferability: 0.3

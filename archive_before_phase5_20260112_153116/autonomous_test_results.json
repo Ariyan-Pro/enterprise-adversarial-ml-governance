@@ -1,0 +1,44 @@
+{
+  "total": 6,
+  "passed": 6,
+  "failed": 0,
+  "results": [
+    {
+      "test": "Module existence",
+      "status": "PASS",
+      "details": "All 4 files present",
+      "timestamp": "14:00:19"
+    },
+    {
+      "test": "Autonomous core",
+      "status": "PASS",
+      "details": "Controller: AutonomousController, Status: active",
+      "timestamp": "14:00:20"
+    },
+    {
+      "test": "Integration module",
+      "status": "PASS",
+      "details": "App: Autonomous Adversarial ML Security Platform, Controller: AutonomousController",
+      "timestamp": "14:00:20"
+    },
+    {
+      "test": "Platform integration",
+      "status": "PASS",
+      "details": "Found 3/4 markers: autonomous_controller, autonomous/status, autonomous_core",
+      "timestamp": "14:00:20"
+    },
+    {
+      "test": "Platform startup",
+      "status": "PASS",
+      "details": "Platform ready for manual testing",
+      "timestamp": "14:22:46"
+    },
+    {
+      "test": "Standalone server",
+      "status": "PASS",
+      "details": "Script available for testing",
+      "timestamp": "14:22:46"
+    }
+  ],
+  "duration": 1346.194509267807
+}

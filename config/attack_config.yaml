@@ -1,0 +1,34 @@
+device: "cpu"
+batch_size: 64
+
+# FGSM Attack - STRONGER
+fgsm:
+  epsilon: 0.3
+  targeted: false
+  clip_min: 0.0
+  clip_max: 1.0
+
+# PGD Attack - MUCH STRONGER
+pgd:
+  epsilon: 0.4
+  alpha: 0.05
+  steps: 20
+  random_start: true
+  targeted: false
+  clip_min: 0.0
+  clip_max: 1.0
+
+# DeepFool Attack
+deepfool:
+  max_iter: 50
+  overshoot: 0.02
+  num_classes: 10
+  clip_min: 0.0
+  clip_max: 1.0
+
+# Evaluation metrics
+metrics:
+  - "accuracy"
+  - "confidence"
+  - "perturbation_norm"
+  - "success_rate"

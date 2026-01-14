@@ -1,0 +1,6 @@
+﻿fgsm_epsilon: 0.15
+pgd_epsilon: 0.3
+pgd_steps: 10
+deepfool_max_iter: 50
+device: cpu
+batch_size: 64

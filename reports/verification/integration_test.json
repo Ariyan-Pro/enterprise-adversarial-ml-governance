@@ -1,0 +1,54 @@
+{
+  "timestamp": "2026-01-11T20:34:39.151344",
+  "components": {
+    "model_loading": {
+      "pass": false,
+      "details": "Error(s) in loading state_dict for MNISTCNN:\n\tMissing key(s) in state_dict: \"conv1.weight\", \"conv1.bias\", \"bn1.weight\", \"bn1.bias\", \"bn1.running_mean\", \"bn1.running_var\", \"conv2.weight\", \"conv2.bias\", \"bn2.weight\", \"bn2.bias\", \"bn2.running_mean\", \"bn2.running_var\", \"fc1.weight\", \"fc1.bias\", \"fc2.weight\", \"fc2.bias\". \n\tUnexpected key(s) in state_dict: \"state_dict\", \"model_class\", \"metadata\". "
+    },
+    "attack_modules": {
+      "fgsm": {
+        "pass": true,
+        "details": "Module exists"
+      },
+      "pgd": {
+        "pass": true,
+        "details": "Module exists"
+      },
+      "cw": {
+        "pass": true,
+        "details": "Module exists"
+      },
+      "deepfool": {
+        "pass": true,
+        "details": "Module exists"
+      }
+    },
+    "defense_modules": {
+      "trades_lite": {
+        "pass": true,
+        "details": "Module exists"
+      },
+      "adv_training": {
+        "pass": true,
+        "details": "Module exists"
+      },
+      "robust_loss": {
+        "pass": true,
+        "details": "Module exists"
+      }
+    },
+    "intelligence_core": {
+      "pass": true,
+      "details": "Attack telemetry initialized"
+    },
+    "governance_system": {
+      "pass": false,
+      "details": "Risk.__init__() missing 1 required positional argument: 'inherent_risk'"
+    },
+    "ci_cd_gates": {
+      "pass": true,
+      "details": "Security gates initialized"
+    }
+  },
+  "overall_pass": false
+}
