@@ -67,8 +67,6 @@ curl -X POST http://localhost:8000/predict \
   -H "Authorization: Bearer $GOVERNANCE_TOKEN" \
   -d '{"tensor":[[[[0.0,0.1,0.2,…]]]],"audit_level":"full"}'
 🏗️ Planet-Scale Architecture
-Table
-Copy
 Layer	Stack
 Edge & Core	Global Load Balancer → Regional Pods → Autonomous Core
 Governance Plane	7-table SQLite Galaxy
@@ -77,8 +75,6 @@ Telemetry Blackhole (Parquet + SHA-256)
 Data Plane	FastAPI Firewall → Model Registry (Hugging Face Hub) → Attack Arsenal
 Observability	Prometheus Exporter → Grafana Dashboards → Alertmanager
 Compliance Matrix
-Table
-Copy
 Component	Technology	Compliance
 Autonomous Core	Python 3.12, AsyncIO	ISO 27001
 Memory Galaxy	SQLite 3.45, WAL mode	SOC 2 Type II
@@ -88,8 +84,6 @@ Firewall	FastAPI + Starlette	OWASP ASVS 4.0
 Registry	Hugging Face Hub	OpenSSF Scorecard
 Packaging	OCI Docker + Helm	SLSA Level 3
 🔐 Security Controls
-Table
-Copy
 Control	Description	Evidence
 Secure Supply Chain	Sigstore cosign signatures	*.sig
 SBOM	CycloneDX JSON	sbom.cdx.json
@@ -99,8 +93,6 @@ Encryption at Rest	AES-256-GCM	docs/crypto.md
 Encryption in Transit	TLS 1.3, PFS	docs/tls.md
 Zero-Trust	mTLS pod-to-pod	deployment/kubernetes/mtls
 📦 Artifact Inventory
-Table
-Copy
 Artifact	Location	SHA-256
 mnist_cnn_fixed.pth	models/pretrained	9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
 model_card.json	Same folder	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
@@ -108,8 +100,6 @@ requirements.txt	Root	7d865e959b2466918c9863afca942d0fb89d24c1347f5be1c1e26b7c0d
 Dockerfile	Root	c3499c5c6b5d3c7c2b8e3e8f3a7b1c1d1e1f1a1b2c3d4e5f6a7b8c9d0e1f2a3b4
 helm-chart-5.0.0.tgz	releases	f5a5fd42d16a20300998abf5c5c4c8c3c2c1c0c9c8c7c6c5c4c3c2c1c0c9c8c7
 🌍 Multi-Planet Distribution
-Table
-Copy
 Planet	Channel	URI
 Earth-GitHub	Source & CI	https://github.com/Ariyan-Pro/enterprise-adversarial-ml-governance
 Earth-HuggingFace	Model & Inference API	https://huggingface.co/Ariyan-Pro/enterprise-adversarial-ml-governance-engine
@@ -119,8 +109,7 @@ Earth-DockerHub	Image	https://hub.docker.com/r/ariyanpro/adversarial-ml-engine
 Earth-PyPI	Wheel (future)	pip install adversarial-ml-governance
 🧪 Validation Matrix
 Run the entire planetary gate in one command:
-bash
-Copy
+Bash
 make planetary-gate   # Requires golang 1.22+ for SLSA attestations
 Exit criteria:
 Robustness ≥ 88.0 / 100
