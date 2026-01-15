@@ -1,33 +1,33 @@
-<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+<!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   Enterprise Adversarial ML Governance Engine
-  Google-Microsoft Scale README  |  v5.0 LTS  |  Jan-2026
-  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+  Google-Microsoft-Scale README  |  v5.0 LTS  |  Jan-2026
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
 <div align="center">
 
-<!-- ---------- LOGO (light / dark) ---------- -->
+<!-- ---------- LOGO (auto light/dark) ---------- -->
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Ariyan-Pro/enterprise-adversarial-ml-governance/main/media/logo_light.svg" width="260">
   <img alt="Governance Engine Logo" src="https://raw.githubusercontent.com/Ariyan-Pro/enterprise-adversarial-ml-governance/main/media/logo_dark.svg" width="260">
 </picture>
 
 <!-- ---------- TITLE ---------- -->
-<h1 style="border-bottom:0; margin-bottom:0">Enterprise Adversarial ML Governance Engine</h1>
+<h1 style="border-bottom: none; margin-bottom: 0;">Enterprise Adversarial ML Governance Engine</h1>
 <h3>v5.0 LTS – Autonomous Security Nervous System for Global AI Fleets</h3>
 
 <!-- ---------- BADGE WALL ---------- -->
 [![Release](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2FAriyan-Pro%2Fenterprise-adversarial-ml-governance%2Fmain%2Fpyproject.toml&query=tool.commitizen.version&label=release&color=0052CC)](https://github.com/Ariyan-Pro/enterprise-adversarial-ml-governance/releases)
 [![License](https://img.shields.io/badge/License-Enterprise%20MIT-00C853?logo=opensourceinitiative)](https://github.com/Ariyan-Pro/enterprise-adversarial-ml-governance/blob/main/LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python)](https://www.python.org/downloads/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C?logo=pytorch)](https://pytorch.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?logo=fastapi)](https://fastapi.tiangolo.com)
+[![Python](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python)](https://www.python.org/downloads/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C?logo=pytorch)](https://pytorch.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?logo=fastapi)](https://fastapi.tiangolo.com)
 [![Docker](https://img.shields.io/badge/Docker-Official-2496ED?logo=docker)](https://hub.docker.com/r/ariyanpro/adversarial-ml-engine)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Helm%20Charts-326CE5?logo=kubernetes)](https://github.com/Ariyan-Pro/enterprise-adversarial-ml-governance/tree/main/deployment/kubernetes)
-[![Hugging Face](https://img.shields.io/badge/🤗_Hub-Model_Repo-FFD21E?logo=huggingface)](https://huggingface.co/Ariyan-Pro/enterprise-adversarial-ml-governance-engine)
-[![Kaggle](https://img.shields.io/badge/📊_Kaggle-Dataset-20BEFF?logo=kaggle)](https://www.kaggle.com/datasets/ariyannadeem/enterprise-adversarial-mlgovernance)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hub-Model%20Repo-FFD21E?logo=huggingface)](https://huggingface.co/Ariyan-Pro/enterprise-adversarial-ml-governance-engine)
+[![Kaggle](https://img.shields.io/badge/%F0%9F%93%8A%20Kaggle-Dataset-20BEFF?logo=kaggle)](https://www.kaggle.com/datasets/ariyannadeem/enterprise-adversarial-mlgovernance)
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=githubactions)](https://github.com/Ariyan-Pro/enterprise-adversarial-ml-governance/actions)
 [![Security](https://img.shields.io/badge/Security-OWASP%20ML%20Top%2010-FF6B6B?logo=owasp)](https://github.com/Ariyan-Pro/enterprise-adversarial-ml-governance/blob/main/docs/owasp-ml-top10.pdf)
 [![FOSSA](https://app.fossa.com/api/projects/custom%2Bgithub%2FAriyan-Pro%2Fenterprise-adversarial-ml-governance.svg?type=shield)](https://app.fossa.com/projects/custom%2Bgithub%2FAriyan-Pro%2Fenterprise-adversarial-ml-governance)
-[![SlSA](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
+[![SLSA](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 
 </div>
 
@@ -35,8 +35,8 @@
 
 ## 📈 Executive Metrics Dashboard
 
-| **Dimension** | **Value** | **Unit** | **Trace** |
-|---------------|-----------|----------|-----------|
+| Dimension | Value | Unit | Trace |
+|-----------|-------|------|-------|
 | Clean Accuracy | 99.0 | % | [logs/accuracy/clean](https://github.com/Ariyan-Pro/enterprise-adversarial-ml-governance/tree/main/logs/accuracy/clean) |
 | FGSM Robustness (ε=0.3) | 96.6 | % | [logs/attacks/fgsm](https://github.com/Ariyan-Pro/enterprise-adversarial-ml-governance/tree/main/logs/attacks/fgsm) |
 | PGD Robustness (ε=0.3) | 96.6 | % | [logs/attacks/pgd](https://github.com/Ariyan-Pro/enterprise-adversarial-ml-governance/tree/main/logs/attacks/pgd) |
@@ -67,41 +67,27 @@ python -m autonomous.core.bootstrap
 uvicorn api_enterprise:app --host 0.0.0.0 --port 8000 --workers 8
 
 # ⑤ Test planetary fleet
-curl -X POST https://api.your-org.com/predict \
+curl -X POST http://localhost:8000/predict \
   -H "Authorization: Bearer $GOVERNANCE_TOKEN" \
-  -d '{"tensor":[[[[0.0,0.1,…]]]],"audit_level":"full"}'
+  -d '{"tensor":[[[[0.0,0.1,0.2,…]]]],"audit_level":"full"}'
 🏗️ Planet-Scale Architecture
-Mermaid
+Table
 Copy
-Code
-Preview
-graph TB
-  subgraph "Edge & Core"
-    A[Global Load Balancer] --> B[Regional Pods]
-    B --> C[Autonomous Core]
-  end
-  subgraph "Governance Plane"
-    C --> D[7-Table SQLite Galaxy]
-    C --> E[Cross-Domain Signalling Bus]
-    C --> F[Telemetry Blackhole]
-  end
-  subgraph "Data Plane"
-    C --> G[FastAPI Firewall]
-    G --> H[Model Registry]
-    G --> I[Attack Arsenal]
-  end
-  subgraph "Observability"
-    C --> J[Prometheus Exporter]
-    C --> K[Grafana Dashboards]
-    C --> L[Alertmanager]
-  end
+Layer	Stack
+Edge & Core	Global Load Balancer → Regional Pods → Autonomous Core
+Governance Plane	7-table SQLite Galaxy
+Cross-Domain Signalling Bus (gRPC + Protobuf)
+Telemetry Blackhole (Parquet + SHA-256)
+Data Plane	FastAPI Firewall → Model Registry (Hugging Face Hub) → Attack Arsenal
+Observability	Prometheus Exporter → Grafana Dashboards → Alertmanager
+Compliance Matrix
 Table
 Copy
 Component	Technology	Compliance
 Autonomous Core	Python 3.12, AsyncIO	ISO 27001
 Memory Galaxy	SQLite 3.45, WAL mode	SOC 2 Type II
-Signalling Bus	gRPC + Protocol Buffers	FedRAMP High
-Telemetry	Parquet + SHA-256	GDPR Art.32
+Signalling Bus	gRPC + Protobuf	FedRAMP High
+Telemetry	Parquet + SHA-256	GDPR Art. 32
 Firewall	FastAPI + Starlette	OWASP ASVS 4.0
 Registry	Hugging Face Hub	OpenSSF Scorecard
 Packaging	OCI Docker + Helm	SLSA Level 3
@@ -119,7 +105,7 @@ Zero-Trust	mTLS pod-to-pod	deployment/kubernetes/mtls
 📦 Artifact Inventory
 Table
 Copy
-Artifact	Location	Checksum SHA-256
+Artifact	Location	SHA-256
 mnist_cnn_fixed.pth	models/pretrained	9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
 model_card.json	Same folder	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 requirements.txt	Root	7d865e959b2466918c9863afca942d0fb89d24c1347f5be1c1e26b7c0d12cc5f
@@ -143,24 +129,6 @@ make planetary-gate   # Requires golang 1.22+ for SLSA attestations
 Exit criteria:
 Robustness ≥ 88.0 / 100
 Latency p99 ≤ 1.2 s (governed)
-CVE count = 0 (High/Critical)
+CVE count = 0 (High / Critical)
 SLSA Level 3 provenance ✓
 Supply-chain signature verified ✓
-📚 Citation BibTeX
-bibtex
-Copy
-@software{enterprise_adversarial_ml_governance_v5_lts,
-  title={Enterprise Adversarial ML Governance Engine v5.0 LTS},
-  author={Ariyan-Pro},
-  year={2026},
-  url={https://github.com/Ariyan-Pro/enterprise-adversarial-ml-governance},
-  note={Planet-scale autonomous security nervous system for AI fleets}
-}
-📄 License
-Enterprise MIT – free for commercial, academic, and inter-planetary use with attribution.
-See LICENSE for full terms.
-<div align="center">
-<sub>🛡️ Security tightens on failure • 🏗️ 10-year LTS • 🌐 Zero-GPU Zero-Lock-in</sub><br/>
-<sub>Last updated: 2026-01-15 | Version: v5.0.0-LTS</sub>
-</div>
-```
