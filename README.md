@@ -1,9 +1,9 @@
 ﻿# Adversarial ML Security Suite
 
 [![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Model-yellow)](https://huggingface.co/Ariyan-Pro/enterprise-adversarial-ml-governance-engine)
-[![Kaggle](https://img.shields.io/badge/Kaggle-Dataset-blue)](https://www.kaggle.com/datasets/ariyanpro/enterprise-adversarial-ml-governance-models)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue)](https://github.com/Ariyan-Pro/enterprise-adversarial-ml-governance)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)[![Kaggle](https://img.shields.io/badge/Kaggle-Dataset-blue)](https://www.kaggle.com/datasets/ariyanpro/enterprise-adversarial-ml-governance-models)
+[![Kaggle Notebook](https://img.shields.io/badge/Kaggle-Notebook-orange)](https://www.kaggle.com/code/ariyanpro/enterprise-adversarial-ml-governance-demo)
 
 
 Enterprise-grade framework for adversarial machine learning research and deployment.
