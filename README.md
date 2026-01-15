@@ -5,11 +5,7 @@
 <div align="center">
 
 <!-- ---------- LOGO (auto light/dark) ---------- -->
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Ariyan-Pro/enterprise-adversarial-ml-governance/main/media/logo_light.svg" width="260">
-  <img alt="Governance Engine Logo" src="https://raw.githubusercontent.com/Ariyan-Pro/enterprise-adversarial-ml-governance/main/media/logo_dark.svg" width="260">
-</picture>
-
+<img alt="Governance Engine Logo" src="logo.JPG" width="260">
 <!-- ---------- TITLE ---------- -->
 <h1 style="border-bottom: none; margin-bottom: 0;">Enterprise Adversarial ML Governance Engine</h1>
 <h3>v5.0 LTS – Autonomous Security Nervous System for Global AI Fleets</h3>
