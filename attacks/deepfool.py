@@ -99,23 +99,19 @@ class DeepFoolAttack:
         # Forward pass
         outputs = self.model(x)
         
-        # Get gradients for all classes
+        # Get gradients for all classes - FIXED: No retain_graph to prevent side-channel
         gradients = []
         for k in range(self.num_classes):
             if k == target_class and target_class is not None:
                 continue
                 
-            # Zero gradients
-            if x.grad is not None:
-                x.grad.zero_()
+            # Create fresh tensor for each gradient computation to prevent accumulation
+            x_fresh = x.clone().detach().requires_grad_(True)
+            outputs_fresh = self.model(x_fresh)
             
-            # Backward for class k
-            outputs[0, k].backward(retain_graph=True)
-            gradients.append(x.grad.clone())
-        
-        # Clean up
-        if x.grad is not None:
-            x.grad.zero_()
+            # Backward for class k WITHOUT retain_graph (prevents side-channel leakage)
+            outputs_fresh[0, k].backward()
+            gradients.append(x_fresh.grad.clone())
         
         return torch.stack(gradients, dim=0), outputs.detach()
     
