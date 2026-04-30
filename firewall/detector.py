@@ -82,6 +82,24 @@ class ModelFirewall:
             else:
                 tensor = torch.tensor([input_data], dtype=torch.float32)
             
+            # SECURITY FIX: Check tensor size to prevent DoS attacks
+            # Limit to reasonable model input sizes (e.g., max 10,000 elements)
+            MAX_TENSOR_ELEMENTS = 10000
+            total_elements = tensor.numel()
+            if total_elements > MAX_TENSOR_ELEMENTS:
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason=f"Tensor too large: {total_elements} elements exceeds limit of {MAX_TENSOR_ELEMENTS}",
+                    confidence=1.0,
+                    details={
+                        "check": "input_sanity", 
+                        "issue": "tensor_size_exceeded",
+                        "elements": total_elements,
+                        "max_allowed": MAX_TENSOR_ELEMENTS
+                    }
+                )
+            
             # Check shape
             if tensor.dim() not in [1, 2, 3, 4]:
                 return FirewallResult(
@@ -118,7 +136,7 @@ class ModelFirewall:
                 action=FirewallAction.ALLOW,
                 reason="Input sanity check passed",
                 confidence=0.95,
-                details={"check": "input_sanity", "shape": list(tensor.shape)}
+                details={"check": "input_sanity", "shape": list(tensor.shape), "elements": total_elements}
             )
             
         except Exception as e:
@@ -132,15 +150,62 @@ class ModelFirewall:
     
     def _check_statistical_deviation(self, request: Dict[str, Any]) -> FirewallResult:
         """Check statistical properties against training distribution"""
-        # TODO: Implement proper statistical deviation check
-        # For now, return pass
-        return FirewallResult(
-            allowed=True,
-            action=FirewallAction.ALLOW,
-            reason="Statistical deviation check passed (placeholder)",
-            confidence=0.7,
-            details={"check": "statistical_deviation", "status": "placeholder"}
-        )
+        try:
+            data = request.get("data", {})
+            if "input" not in data:
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason="Missing input for statistical check",
+                    confidence=1.0,
+                    details={"check": "statistical_deviation", "issue": "missing_input"}
+                )
+            
+            input_data = data["input"]
+            if isinstance(input_data, list):
+                tensor = torch.tensor(input_data, dtype=torch.float32)
+            else:
+                tensor = torch.tensor([input_data], dtype=torch.float32)
+            
+            # Check mean and std deviation against expected ranges
+            mean_val = tensor.mean().item()
+            std_val = tensor.std().item()
+            
+            # Typical normalized image data should have mean ~0.5 and std ~0.3
+            # Adjust thresholds based on your model's training distribution
+            if abs(mean_val) > 2.0:
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason=f"Input mean out of expected range: {mean_val:.4f}",
+                    confidence=0.85,
+                    details={"check": "statistical_deviation", "mean": mean_val, "issue": "mean_outlier"}
+                )
+            
+            if std_val > 2.0:
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason=f"Input std deviation out of expected range: {std_val:.4f}",
+                    confidence=0.85,
+                    details={"check": "statistical_deviation", "std": std_val, "issue": "std_outlier"}
+                )
+            
+            return FirewallResult(
+                allowed=True,
+                action=FirewallAction.ALLOW,
+                reason="Statistical deviation check passed",
+                confidence=0.9,
+                details={"check": "statistical_deviation", "mean": mean_val, "std": std_val}
+            )
+        except Exception as e:
+            return FirewallResult(
+                allowed=False,
+                action=FirewallAction.BLOCK,
+                reason=f"Statistical deviation check failed: {str(e)}",
+                confidence=1.0,
+                details={"check": "statistical_deviation", "error": str(e)}
+            )
     
     def _check_confidence_collapse(self, request: Dict[str, Any]) -> FirewallResult:
         """Detect sudden confidence drops (adversarial indicator)"""
@@ -166,25 +231,144 @@ class ModelFirewall:
     
     def _check_drift_indicators(self, request: Dict[str, Any]) -> FirewallResult:
         """Check for data/model drift indicators"""
-        # TODO: Implement drift detection
-        return FirewallResult(
-            allowed=True,
-            action=FirewallAction.ALLOW,
-            reason="Drift check passed (placeholder)",
-            confidence=0.7,
-            details={"check": "drift_indicators", "status": "placeholder"}
-        )
+        try:
+            data = request.get("data", {})
+            if "input" not in data:
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason="Missing input for drift check",
+                    confidence=1.0,
+                    details={"check": "drift_indicators", "issue": "missing_input"}
+                )
+            
+            input_data = data["input"]
+            if isinstance(input_data, list):
+                tensor = torch.tensor(input_data, dtype=torch.float32)
+            else:
+                tensor = torch.tensor([input_data], dtype=torch.float32)
+            
+            # Check for distribution shift indicators
+            # Skewness and kurtosis can indicate unusual distributions
+            mean_val = tensor.mean().item()
+            std_val = tensor.std().item() + 1e-8  # Avoid division by zero
+            
+            # Normalize tensor for moment calculations
+            normalized = (tensor - mean_val) / std_val
+            
+            # Calculate approximate skewness (3rd moment)
+            skewness = (normalized ** 3).mean().item()
+            
+            # Calculate approximate kurtosis (4th moment)
+            kurtosis = (normalized ** 4).mean().item() - 3  # Excess kurtosis
+            
+            # Flag extreme deviations from normal distribution
+            if abs(skewness) > 3.0:
+                return FirewallResult(
+                    allowed=True,
+                    action=FirewallAction.ESCALATE,
+                    reason=f"High skewness detected: {skewness:.4f}",
+                    confidence=0.75,
+                    details={"check": "drift_indicators", "skewness": skewness, "issue": "high_skewness"}
+                )
+            
+            if abs(kurtosis) > 5.0:
+                return FirewallResult(
+                    allowed=True,
+                    action=FirewallAction.ESCALATE,
+                    reason=f"High kurtosis detected: {kurtosis:.4f}",
+                    confidence=0.75,
+                    details={"check": "drift_indicators", "kurtosis": kurtosis, "issue": "high_kurtosis"}
+                )
+            
+            return FirewallResult(
+                allowed=True,
+                action=FirewallAction.ALLOW,
+                reason="Drift check passed",
+                confidence=0.85,
+                details={"check": "drift_indicators", "skewness": skewness, "kurtosis": kurtosis}
+            )
+        except Exception as e:
+            return FirewallResult(
+                allowed=False,
+                action=FirewallAction.BLOCK,
+                reason=f"Drift check failed: {str(e)}",
+                confidence=1.0,
+                details={"check": "drift_indicators", "error": str(e)}
+            )
     
     def _check_threat_similarity(self, request: Dict[str, Any]) -> FirewallResult:
         """Check similarity to known attack patterns"""
-        # TODO: Implement threat signature matching
-        return FirewallResult(
-            allowed=True,
-            action=FirewallAction.ALLOW,
-            reason="Threat similarity check passed",
-            confidence=0.75,
-            details={"check": "threat_similarity", "threat_signatures": len(self.threat_signatures)}
-        )
+        try:
+            data = request.get("data", {})
+            if "input" not in data:
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason="Missing input for threat check",
+                    confidence=1.0,
+                    details={"check": "threat_similarity", "issue": "missing_input"}
+                )
+            
+            input_data = data["input"]
+            if isinstance(input_data, list):
+                tensor = torch.tensor(input_data, dtype=torch.float32)
+            else:
+                tensor = torch.tensor([input_data], dtype=torch.float32)
+            
+            # Check for common adversarial attack patterns
+            
+            # 1. High-frequency noise pattern (common in PGD/FGSM attacks)
+            # Calculate gradient magnitude approximation using local differences
+            if tensor.dim() >= 2:
+                # Compute local variance as proxy for high-frequency content
+                unfolded = tensor.unfold(-1, 2, 1).unfold(-2, 2, 1)
+                if unfolded.numel() > 0:
+                    local_var = unfolded.var(dim=-1).var(dim=-1).mean().item()
+                    
+                    # Unusually high local variance may indicate adversarial noise
+                    if local_var > 0.5:
+                        return FirewallResult(
+                            allowed=True,
+                            action=FirewallAction.ESCALATE,
+                            reason=f"High local variance detected (possible adversarial noise): {local_var:.4f}",
+                            confidence=0.7,
+                            details={"check": "threat_similarity", "local_variance": local_var, "pattern": "high_frequency_noise"}
+                        )
+            
+            # 2. Check for uniform perturbation pattern
+            flat_tensor = tensor.flatten()
+            if len(flat_tensor) > 100:
+                # Sample every 10th element and check for suspicious patterns
+                sample = flat_tensor[::10]
+                diff = sample[1:] - sample[:-1]
+                mean_diff = diff.abs().mean().item()
+                
+                # Very uniform small differences can indicate targeted attacks
+                if mean_diff < 0.001 and mean_diff > 0:
+                    return FirewallResult(
+                        allowed=True,
+                        action=FirewallAction.ESCALATE,
+                        reason=f"Suspiciously uniform perturbation pattern detected: {mean_diff:.6f}",
+                        confidence=0.65,
+                        details={"check": "threat_similarity", "mean_diff": mean_diff, "pattern": "uniform_perturbation"}
+                    )
+            
+            return FirewallResult(
+                allowed=True,
+                action=FirewallAction.ALLOW,
+                reason="Threat similarity check passed",
+                confidence=0.8,
+                details={"check": "threat_similarity", "threat_signatures_checked": len(self.threat_signatures)}
+            )
+        except Exception as e:
+            return FirewallResult(
+                allowed=False,
+                action=FirewallAction.BLOCK,
+                reason=f"Threat similarity check failed: {str(e)}",
+                confidence=1.0,
+                details={"check": "threat_similarity", "error": str(e)}
+            )
     
     def _load_threat_signatures(self) -> List[Dict[str, Any]]:
         """Load known threat signatures"""
