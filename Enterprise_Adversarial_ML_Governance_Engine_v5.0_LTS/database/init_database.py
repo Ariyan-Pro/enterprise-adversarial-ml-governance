@@ -40,7 +40,9 @@ def create_database():
             if not result:
                 print(f"Creating database: {DATABASE_CONFIG.database}")
                 conn.execute(text("COMMIT"))  # Exit transaction
-                conn.execute(text(f'CREATE DATABASE "{DATABASE_CONFIG.database}"'))
+                # Use identifier-safe quoting for database name to prevent SQL injection
+                db_name = DATABASE_CONFIG.database.replace('"', '""')
+                conn.execute(text(f'CREATE DATABASE "{db_name}"'))
                 print("✅ Database created")
             else:
                 print(f"✅ Database already exists: {DATABASE_CONFIG.database}")
