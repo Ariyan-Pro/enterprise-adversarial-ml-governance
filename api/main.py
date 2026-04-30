@@ -1,4 +1,4 @@
-﻿"""
+"""
 🛡️ ENTERPRISE ADVERSARIAL ML SECURITY API - UNIFIED LAYER
 Core Rule: Inference is a privilege, not a right.
 """
@@ -9,6 +9,8 @@ import jwt
 import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from collections import defaultdict
+import time
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent
@@ -16,7 +18,7 @@ sys.path.insert(0, str(project_root))
 
 import torch
 import numpy as np
-from fastapi import FastAPI, Depends, HTTPException, Security
+from fastapi import FastAPI, Depends, HTTPException, Security, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from contextlib import asynccontextmanager
@@ -47,6 +49,13 @@ firewall = None
 model_router = None
 attack_intel = None
 audit_logger = None
+
+# Rate limiting configuration
+RATE_LIMIT_REQUESTS = 100  # Maximum requests per window
+RATE_LIMIT_WINDOW_SECONDS = 60  # Time window in seconds
+
+# In-memory rate limit storage (use Redis in production)
+rate_limit_storage = defaultdict(list)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -110,11 +119,123 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Rate limiting middleware (placeholder - implement properly)
+def get_client_identifier(request: Request) -> str:
+    """Extract client identifier for rate limiting (IP or user ID)"""
+    # Try to get user ID from authorization header first
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]  # Remove "Bearer " prefix
+        try:
+            payload = jwt.decode(
+                token,
+                JWT_SECRET_KEY,
+                algorithms=[JWT_ALGORITHM],
+                options={"require": ["exp", "iat", "sub"]}
+            )
+            return f"user:{payload.get('sub')}"
+        except jwt.InvalidTokenError:
+            pass
+    
+    # Fall back to IP address
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        ip = forwarded.split(",")[0].strip()
+    else:
+        client_host = request.client.host if request.client else "unknown"
+        ip = client_host
+    
+    return f"ip:{ip}"
+
+
+def check_rate_limit(client_id: str) -> tuple[bool, Dict[str, Any]]:
+    """
+    Check if client has exceeded rate limit using sliding window algorithm.
+    
+    Returns:
+        tuple: (is_allowed, metadata_dict)
+    """
+    current_time = time.time()
+    window_start = current_time - RATE_LIMIT_WINDOW_SECONDS
+    
+    # Clean up old entries and count recent requests
+    recent_requests = [
+        ts for ts in rate_limit_storage[client_id]
+        if ts > window_start
+    ]
+    
+    # Update storage with cleaned list
+    rate_limit_storage[client_id] = recent_requests
+    
+    # Check if limit exceeded
+    if len(recent_requests) >= RATE_LIMIT_REQUESTS:
+        oldest_request = min(recent_requests) if recent_requests else current_time
+        retry_after = int(oldest_request + RATE_LIMIT_WINDOW_SECONDS - current_time) + 1
+        return False, {
+            "retry_after": max(1, retry_after),
+            "limit": RATE_LIMIT_REQUESTS,
+            "window_seconds": RATE_LIMIT_WINDOW_SECONDS,
+            "remaining": 0
+        }
+    
+    # Record this request
+    rate_limit_storage[client_id].append(current_time)
+    remaining = RATE_LIMIT_REQUESTS - len(rate_limit_storage[client_id])
+    
+    return True, {
+        "limit": RATE_LIMIT_REQUESTS,
+        "window_seconds": RATE_LIMIT_WINDOW_SECONDS,
+        "remaining": remaining,
+        "reset": int(current_time + RATE_LIMIT_WINDOW_SECONDS)
+    }
+
+
 @app.middleware("http")
-async def rate_limit_middleware(request, call_next):
-    # TODO: Implement proper rate limiting
+async def rate_limit_middleware(request: Request, call_next):
+    """
+    Enterprise rate limiting middleware to prevent DoS attacks.
+    Implements sliding window rate limiting per client (user or IP).
+    """
+    # Skip rate limiting for health checks to allow monitoring
+    if request.url.path in ["/health", "/api/v1/health"]:
+        response = await call_next(request)
+        return response
+    
+    # Get client identifier
+    client_id = get_client_identifier(request)
+    
+    # Check rate limit
+    is_allowed, metadata = check_rate_limit(client_id)
+    
+    if not is_allowed:
+        logger.warning(
+            f"🚫 RATE LIMIT EXCEEDED for client: {client_id} | "
+            f"Limit: {metadata['limit']}/{metadata['window_seconds']}s"
+        )
+        raise HTTPException(
+            status_code=429,
+            headers={
+                "X-RateLimit-Limit": str(metadata["limit"]),
+                "X-RateLimit-Window": str(metadata["window_seconds"]),
+                "X-RateLimit-Remaining": "0",
+                "Retry-After": str(metadata["retry_after"])
+            },
+            detail={
+                "status": "rate_limit_exceeded",
+                "error": "Too many requests. Please slow down.",
+                "retry_after_seconds": metadata["retry_after"],
+                "limit": metadata["limit"],
+                "window_seconds": metadata["window_seconds"]
+            }
+        )
+    
+    # Process request
     response = await call_next(request)
+    
+    # Add rate limit headers to response
+    response.headers["X-RateLimit-Limit"] = str(metadata["limit"])
+    response.headers["X-RateLimit-Window"] = str(metadata["window_seconds"])
+    response.headers["X-RateLimit-Remaining"] = str(metadata["remaining"])
+    
     return response
 
 # ==================== AUTHENTICATION & RBAC ====================
