@@ -5,7 +5,10 @@ Core Rule: Inference is a privilege, not a right.
 import os
 import sys
 from pathlib import Path
-import sys
+import jwt
+import hashlib
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent
@@ -13,12 +16,6 @@ sys.path.insert(0, str(project_root))
 
 import torch
 import numpy as np
-from fastapi import FastAPI, Depends, HTTPException, Security
-
-# Add project root to Python path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
 from fastapi import FastAPI, Depends, HTTPException, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -39,6 +36,11 @@ logger = logging.getLogger("enterprise_api")
 
 # Security
 security = HTTPBearer()
+
+# JWT Configuration - Use environment variable or generate secure default
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", os.urandom(32).hex())
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_HOURS = 24
 
 # Global components (initialized in lifespan)
 firewall = None
@@ -117,14 +119,51 @@ async def rate_limit_middleware(request, call_next):
 
 # ==================== AUTHENTICATION & RBAC ====================
 async def authenticate(credentials: HTTPAuthorizationCredentials = Security(security)) -> Dict[str, Any]:
-    """Enterprise authentication with RBAC"""
-    # TODO: Implement JWT validation and RBAC
-    # For now, return a mock user
-    return {
-        "user_id": "enterprise_user",
-        "roles": ["ml_engineer", "security_analyst"],
-        "permissions": ["predict", "attack_test", "view_reports"]
-    }
+    """Enterprise authentication with JWT validation and RBAC"""
+    token = credentials.credentials
+    
+    try:
+        # Validate JWT token
+        payload = jwt.decode(
+            token,
+            JWT_SECRET_KEY,
+            algorithms=[JWT_ALGORITHM],
+            options={"require": ["exp", "iat", "sub"]}
+        )
+        
+        # Extract user information from validated token
+        user_id = payload.get("sub")
+        roles = payload.get("roles", [])
+        permissions = payload.get("permissions", [])
+        
+        # Log successful authentication
+        logger.info(f"✅ Authenticated user: {user_id} with roles: {roles}")
+        
+        return {
+            "user_id": user_id,
+            "roles": roles,
+            "permissions": permissions,
+            "token_payload": payload
+        }
+        
+    except jwt.ExpiredSignatureError:
+        logger.warning(f"⚠️ Expired token attempt")
+        raise HTTPException(
+            status_code=401,
+            detail="Token has expired. Please obtain a new token."
+        )
+    except jwt.InvalidTokenError as e:
+        logger.warning(f"⚠️ Invalid token attempt: {str(e)}")
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid token. Authentication failed."
+        )
+    except Exception as e:
+        logger.error(f"❌ Authentication error: {str(e)}")
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication failed."
+        )
 
 def check_permission(user: Dict[str, Any], required_permission: str):
     """Check if user has required permission"""
@@ -285,6 +324,77 @@ async def list_models(user: Dict[str, Any] = Depends(authenticate)):
     return {
         "count": len(models),
         "models": models
+    }
+
+# ==================== TOKEN MANAGEMENT ====================
+@app.post("/api/v1/auth/token")
+async def generate_token(token_request: Dict[str, Any]):
+    """
+    Generate a JWT token for authenticated users.
+    In production, this should validate credentials against a secure identity provider.
+    
+    Expected request body:
+    {
+        "username": "user@example.com",
+        "password": "secure_password",
+        "roles": ["ml_engineer"],  # optional
+        "permissions": ["predict", "view_reports"]  # optional
+    }
+    """
+    # TODO: In production, validate credentials against your identity provider
+    # For now, we accept any non-empty username/password combination
+    username = token_request.get("username")
+    password = token_request.get("password")
+    
+    if not username or not password:
+        raise HTTPException(
+            status_code=400,
+            detail="Username and password are required"
+        )
+    
+    # TODO: Implement proper credential validation against your IDP
+    # Example: validate_credentials(username, password)
+    
+    # Set default permissions based on roles if not provided
+    roles = token_request.get("roles", ["ml_engineer"])
+    default_permissions = {
+        "ml_engineer": ["predict", "view_reports"],
+        "security_analyst": ["predict", "attack_test", "view_reports"],
+        "admin": ["predict", "attack_test", "view_reports", "model_management"]
+    }
+    
+    permissions = token_request.get("permissions")
+    if not permissions:
+        permissions = []
+        for role in roles:
+            permissions.extend(default_permissions.get(role, []))
+        permissions = list(set(permissions))  # Remove duplicates
+    
+    # Create JWT payload
+    now = datetime.now(timezone.utc)
+    expiration = now + timedelta(hours=JWT_EXPIRATION_HOURS)
+    
+    payload = {
+        "sub": username,
+        "iat": now,
+        "exp": expiration,
+        "roles": roles,
+        "permissions": permissions,
+        "jti": hashlib.sha256(os.urandom(32)).hexdigest()  # Unique token ID
+    }
+    
+    # Sign and encode the token
+    token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    
+    logger.info(f"✅ Token generated for user: {username}")
+    
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": JWT_EXPIRATION_HOURS * 3600,
+        "expires_at": expiration.isoformat(),
+        "roles": roles,
+        "permissions": permissions
     }
 
 # ==================== STARTUP ====================
