@@ -5,7 +5,7 @@ Provides database session management for SQLite/PostgreSQL with mock fallback.
 
 import os
 from pathlib import Path
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.exc import OperationalError
 import sys
@@ -163,8 +163,8 @@ def get_session():
         Session = scoped_session(sessionmaker(bind=engine))
         session = Session()
         
-        # Test connection
-        session.execute("SELECT 1")
+        # Test connection with proper text() wrapper for SQLAlchemy 2.0+
+        session.execute(text("SELECT 1"))
         
         print("✅ Real database session created")
         return session
