@@ -46,11 +46,15 @@ def load_model_weights(model: nn.Module, model_path: str) -> bool:
                     model.load_state_dict(checkpoint)
                     print(f"Loaded model from state dict")
                     return True
-                except:
+                except Exception as e:
                     # Try with strict=False
-                    model.load_state_dict(checkpoint, strict=False)
-                    print(f"Loaded model with strict=False (some keys missing)")
-                    return True
+                    try:
+                        model.load_state_dict(checkpoint, strict=False)
+                        print(f"Loaded model with strict=False (some keys missing)")
+                        return True
+                    except Exception as e2:
+                        print(f"Failed to load model state dict: {e}, then {e2}")
+                        return False
         else:
             # Assume it's a state dict
             model.load_state_dict(checkpoint)
@@ -59,6 +63,8 @@ def load_model_weights(model: nn.Module, model_path: str) -> bool:
             
     except Exception as e:
         print(f"Error loading model from {model_path}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def load_model_with_flexibility(model: nn.Module, model_path: str) -> bool:
@@ -143,6 +149,8 @@ def load_model_with_flexibility(model: nn.Module, model_path: str) -> bool:
             
     except Exception as e:
         print(f"❌ Error loading model: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def create_and_load_model(model_class, model_path: str, **kwargs) -> Optional[nn.Module]:
@@ -169,19 +177,41 @@ def create_and_load_model(model_class, model_path: str, **kwargs) -> Optional[nn
 
 def save_model_with_metadata(model: nn.Module, model_path: str, metadata: Dict[str, Any] = None):
     """
-    Save model with metadata
+    Save model with metadata - sanitized to prevent Unicode injection
     
     Args:
         model: Model to save
         model_path: Path to save to
-        metadata: Additional metadata
+        metadata: Additional metadata (will be sanitized)
     """
+    def sanitize_value(value):
+        """Sanitize metadata values to prevent Unicode injection attacks"""
+        if isinstance(value, str):
+            # Remove or escape potentially dangerous Unicode characters
+            # that could be used for injection attacks
+            import re
+            # Remove zero-width characters and other invisible Unicode
+            value = re.sub(r'[\u200b-\u200f\u2060\ufeff]', '', value)
+            # Normalize Unicode to prevent confusable attacks
+            import unicodedata
+            value = unicodedata.normalize('NFKC', value)
+            return value
+        elif isinstance(value, dict):
+            return {k: sanitize_value(v) for k, v in value.items()}
+        elif isinstance(value, list):
+            return [sanitize_value(item) for item in value]
+        else:
+            return value
+    
+    # Sanitize metadata before saving
+    sanitized_metadata = sanitize_value(metadata) if metadata else {}
+    
     checkpoint = {
         'state_dict': model.state_dict(),
         'model_class': model.__class__.__name__,
-        'metadata': metadata or {}
+        'metadata': sanitized_metadata
     }
     
     Path(model_path).parent.mkdir(parents=True, exist_ok=True)
     torch.save(checkpoint, model_path)
-    print(f"Model saved to {model_path} with metadata")
+    print(f"Model saved to {model_path} with sanitized metadata")

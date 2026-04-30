@@ -23,8 +23,8 @@ class DatabaseConfig:
     host: str = os.getenv("DB_HOST", "localhost")
     port: int = int(os.getenv("DB_PORT", "5432"))
     database: str = os.getenv("DB_NAME", "security_nervous_system")
-    user: str = os.getenv("DB_USER", "postgres")
-    password: str = os.getenv("DB_PASSWORD", "postgres")
+    user: str = os.getenv("DB_USER", "")
+    password: str = os.getenv("DB_PASSWORD", "")
     
     # Connection pooling
     pool_size: int = 5
@@ -39,6 +39,17 @@ class DatabaseConfig:
     # Reliability
     retry_attempts: int = 3
     retry_delay: float = 1.0
+    
+    def __post_init__(self):
+        """Validate configuration after initialization"""
+        if not self.user or not self.password:
+            import warnings
+            warnings.warn(
+                "Database credentials not configured via environment variables. "
+                "Set DB_USER and DB_PASSWORD environment variables for production use.",
+                UserWarning,
+                stacklevel=2
+            )
     
     @property
     def connection_string(self) -> str:
