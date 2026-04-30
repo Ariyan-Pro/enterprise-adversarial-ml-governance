@@ -12,6 +12,10 @@ from attacks.fgsm import FGSMAttack
 class PGDAttack:
     """PGD attack with random restarts and adaptive step size"""
     
+    # Valid epsilon range constants
+    MIN_EPSILON = 0.001  # Minimum meaningful perturbation
+    MAX_EPSILON = 1.0    # Maximum valid perturbation (full pixel range)
+    
     def __init__(self, model: nn.Module, config: Optional[Dict[str, Any]] = None):
         """
         Initialize PGD attack
@@ -23,8 +27,9 @@ class PGDAttack:
         self.model = model
         self.config = config or {}
         
-        # Default parameters
-        self.epsilon = self.config.get('epsilon', 0.3)
+        # Default parameters with validation
+        raw_epsilon = self.config.get('epsilon', 0.3)
+        self.epsilon = self._validate_epsilon(raw_epsilon)
         self.alpha = self.config.get('alpha', 0.01)
         self.steps = self.config.get('steps', 10)
         self.random_start = self.config.get('random_start', True)
@@ -36,7 +41,57 @@ class PGDAttack:
         
         self.criterion = nn.CrossEntropyLoss()
         self.model.eval()
+    
+    @staticmethod
+    def _validate_epsilon(epsilon: float) -> float:
+        """
+        Validate epsilon parameter to prevent security bypass
         
+        Args:
+            epsilon: Epsilon value to validate
+            
+        Returns:
+            float: Validated epsilon value
+            
+        Raises:
+            ValueError: If epsilon is invalid (NaN, Inf, negative, or out of range)
+        """
+        import math
+        
+        # Check for NaN
+        if isinstance(epsilon, float) and math.isnan(epsilon):
+            raise ValueError(f"Invalid epsilon: NaN is not allowed (got {epsilon})")
+        
+        # Check for Infinity
+        if isinstance(epsilon, float) and math.isinf(epsilon):
+            raise ValueError(f"Invalid epsilon: Infinity is not allowed (got {epsilon})")
+        
+        # Convert to float if needed
+        try:
+            epsilon = float(epsilon)
+        except (TypeError, ValueError):
+            raise ValueError(f"Invalid epsilon: must be a number, got {type(epsilon)}")
+        
+        # Check for negative values
+        if epsilon < 0:
+            raise ValueError(f"Invalid epsilon: must be non-negative, got {epsilon}")
+        
+        # Check minimum bound
+        if epsilon < PGDAttack.MIN_EPSILON:
+            raise ValueError(
+                f"Invalid epsilon: must be >= {PGDAttack.MIN_EPSILON}, got {epsilon}. "
+                f"Use 0 for no perturbation."
+            )
+        
+        # Check maximum bound
+        if epsilon > PGDAttack.MAX_EPSILON:
+            raise ValueError(
+                f"Invalid epsilon: must be <= {PGDAttack.MAX_EPSILON}, got {epsilon}. "
+                f"Values > 1.0 exceed normalized pixel range."
+            )
+        
+        return epsilon
+    
     def _project_onto_l_inf_ball(self, 
                                 x: torch.Tensor, 
                                 perturbation: torch.Tensor) -> torch.Tensor:

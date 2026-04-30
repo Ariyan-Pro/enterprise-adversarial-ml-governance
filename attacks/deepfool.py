@@ -12,6 +12,10 @@ import warnings
 class DeepFoolAttack:
     """DeepFool attack for minimal perturbation"""
     
+    # Valid overshoot range constants
+    MIN_OVERSHOOT = 0.0
+    MAX_OVERSHOOT = 1.0
+    
     def __init__(self, model: nn.Module, config: Optional[Dict[str, Any]] = None):
         """
         Initialize DeepFool attack
@@ -23,15 +27,59 @@ class DeepFoolAttack:
         self.model = model
         self.config = config or {}
         
-        # Default parameters
+        # Default parameters with validation
+        raw_overshoot = self.config.get('overshoot', 0.02)
+        self.overshoot = self._validate_overshoot(raw_overshoot)
         self.max_iter = self.config.get('max_iter', 50)
-        self.overshoot = self.config.get('overshoot', 0.02)
         self.num_classes = self.config.get('num_classes', 10)
         self.clip_min = self.config.get('clip_min', 0.0)
         self.clip_max = self.config.get('clip_max', 1.0)
         self.device = self.config.get('device', 'cpu')
         
         self.model.eval()
+    
+    @staticmethod
+    def _validate_overshoot(overshoot: float) -> float:
+        """
+        Validate overshoot parameter to prevent security bypass
+        
+        Args:
+            overshoot: Overshoot value to validate
+            
+        Returns:
+            float: Validated overshoot value
+            
+        Raises:
+            ValueError: If overshoot is invalid (NaN, Inf, negative, or out of range)
+        """
+        import math
+        
+        # Check for NaN
+        if isinstance(overshoot, float) and math.isnan(overshoot):
+            raise ValueError(f"Invalid overshoot: NaN is not allowed (got {overshoot})")
+        
+        # Check for Infinity
+        if isinstance(overshoot, float) and math.isinf(overshoot):
+            raise ValueError(f"Invalid overshoot: Infinity is not allowed (got {overshoot})")
+        
+        # Convert to float if needed
+        try:
+            overshoot = float(overshoot)
+        except (TypeError, ValueError):
+            raise ValueError(f"Invalid overshoot: must be a number, got {type(overshoot)}")
+        
+        # Check for negative values
+        if overshoot < 0:
+            raise ValueError(f"Invalid overshoot: must be non-negative, got {overshoot}")
+        
+        # Check maximum bound
+        if overshoot > DeepFoolAttack.MAX_OVERSHOOT:
+            raise ValueError(
+                f"Invalid overshoot: must be <= {DeepFoolAttack.MAX_OVERSHOOT}, got {overshoot}. "
+                f"Excessive overshoot values can cause numerical instability."
+            )
+        
+        return overshoot
         
     def _compute_gradients(self, 
                           x: torch.Tensor, 
