@@ -13,21 +13,41 @@ from datetime import datetime
 
 def save_model(model: nn.Module, path: str, metadata: Optional[Dict] = None):
     """
-    Save model with metadata
+    Save model with metadata - sanitized to prevent Unicode injection
     
     Args:
         model: PyTorch model
         path: Path to save model
-        metadata: Additional metadata to save
+        metadata: Additional metadata to save (will be sanitized)
     """
     
+    def sanitize_value(value):
+        """Sanitize metadata values to prevent Unicode injection attacks"""
+        if isinstance(value, str):
+            import re
+            import unicodedata
+            # Remove zero-width characters and other invisible Unicode
+            value = re.sub(r'[\u200b-\u200f\u2060\ufeff]', '', value)
+            # Normalize Unicode to prevent confusable attacks
+            value = unicodedata.normalize('NFKC', value)
+            return value
+        elif isinstance(value, dict):
+            return {k: sanitize_value(v) for k, v in value.items()}
+        elif isinstance(value, list):
+            return [sanitize_value(item) for item in value]
+        else:
+            return value
+    
     Path(path).parent.mkdir(parents=True, exist_ok=True)
+    
+    # Sanitize metadata before saving
+    sanitized_metadata = sanitize_value(metadata) if metadata else {}
     
     # Save model state
     torch.save({
         'state_dict': model.state_dict(),
         'model_class': model.__class__.__name__,
-        'metadata': metadata or {}
+        'metadata': sanitized_metadata
     }, path)
     
     # Save model card
@@ -37,7 +57,7 @@ def save_model(model: nn.Module, path: str, metadata: Optional[Dict] = None):
         'parameters': sum(p.numel() for p in model.parameters()),
         'trainable_parameters': sum(p.numel() for p in model.parameters() if p.requires_grad),
         'save_timestamp': str(datetime.now()),
-        **metadata
+        **sanitized_metadata
     }
     
     model_card_path = Path(path).with_suffix('.json')

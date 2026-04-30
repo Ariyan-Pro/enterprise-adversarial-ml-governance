@@ -1,3 +1,36 @@
-(api_enterprise.py and firewall/detector.py are source code files, no build artifacts, dependencies, or temp files detected in changes)
+```gitignore
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-(empty)
+# Dependencies
+.venv/
+venv/
+env/
+pip-log.txt
+pip-selfcheck.json
+
+# Build and distribution artifacts
+build/
+dist/
+*.egg
+*.egg-info/
+*.so
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+*.env.*
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+```
