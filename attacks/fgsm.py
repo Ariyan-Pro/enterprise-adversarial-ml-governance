@@ -11,6 +11,10 @@ import numpy as np
 class FGSMAttack:
     """FGSM attack with targeted/non-targeted variants"""
     
+    # Valid epsilon range constants
+    MIN_EPSILON = 0.001  # Minimum meaningful perturbation
+    MAX_EPSILON = 1.0    # Maximum valid perturbation (full pixel range)
+    
     def __init__(self, model: nn.Module, config: Optional[Dict[str, Any]] = None):
         """
         Initialize FGSM attack
@@ -22,8 +26,9 @@ class FGSMAttack:
         self.model = model
         self.config = config or {}
         
-        # Default parameters
-        self.epsilon = self.config.get('epsilon', 0.15)
+        # Default parameters with validation
+        raw_epsilon = self.config.get('epsilon', 0.15)
+        self.epsilon = self._validate_epsilon(raw_epsilon)
         self.targeted = self.config.get('targeted', False)
         self.clip_min = self.config.get('clip_min', 0.0)
         self.clip_max = self.config.get('clip_max', 1.0)
@@ -32,6 +37,56 @@ class FGSMAttack:
         self.criterion = nn.CrossEntropyLoss()
         self.model.eval()
         self.model.to(self.device)
+    
+    @staticmethod
+    def _validate_epsilon(epsilon: float) -> float:
+        """
+        Validate epsilon parameter to prevent security bypass
+        
+        Args:
+            epsilon: Epsilon value to validate
+            
+        Returns:
+            float: Validated epsilon value
+            
+        Raises:
+            ValueError: If epsilon is invalid (NaN, Inf, negative, or out of range)
+        """
+        import math
+        
+        # Check for NaN
+        if isinstance(epsilon, float) and math.isnan(epsilon):
+            raise ValueError(f"Invalid epsilon: NaN is not allowed (got {epsilon})")
+        
+        # Check for Infinity
+        if isinstance(epsilon, float) and math.isinf(epsilon):
+            raise ValueError(f"Invalid epsilon: Infinity is not allowed (got {epsilon})")
+        
+        # Convert to float if needed
+        try:
+            epsilon = float(epsilon)
+        except (TypeError, ValueError):
+            raise ValueError(f"Invalid epsilon: must be a number, got {type(epsilon)}")
+        
+        # Check for negative values
+        if epsilon < 0:
+            raise ValueError(f"Invalid epsilon: must be non-negative, got {epsilon}")
+        
+        # Check minimum bound
+        if epsilon < FGSMAttack.MIN_EPSILON:
+            raise ValueError(
+                f"Invalid epsilon: must be >= {FGSMAttack.MIN_EPSILON}, got {epsilon}. "
+                f"Use 0 for no perturbation."
+            )
+        
+        # Check maximum bound
+        if epsilon > FGSMAttack.MAX_EPSILON:
+            raise ValueError(
+                f"Invalid epsilon: must be <= {FGSMAttack.MAX_EPSILON}, got {epsilon}. "
+                f"Values > 1.0 exceed normalized pixel range."
+            )
+        
+        return epsilon
         
     def _validate_inputs(self, images: torch.Tensor, labels: torch.Tensor) -> None:
         """Validate input tensors - FIXED: Remove strict device check"""

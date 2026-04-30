@@ -23,6 +23,14 @@ class CarliniWagnerL2:
     - Comprehensive logging and metrics
     """
     
+    # Valid parameter range constants
+    MIN_CONFIDENCE = 0.0
+    MAX_CONFIDENCE = 100.0
+    MIN_LEARNING_RATE = 1e-8
+    MAX_LEARNING_RATE = 1.0
+    MIN_CONST = 1e-10
+    MAX_CONST = 1e10
+    
     def __init__(self, model: nn.Module, config: Optional[Dict[str, Any]] = None):
         """
         Initialize C&W attack
@@ -34,12 +42,18 @@ class CarliniWagnerL2:
         self.model = model
         self.config = config or {}
         
-        # Attack parameters with defaults
-        self.confidence = self.config.get('confidence', 0.0)
+        # Attack parameters with validation
+        raw_confidence = self.config.get('confidence', 0.0)
+        self.confidence = self._validate_confidence(raw_confidence)
+        
+        raw_learning_rate = self.config.get('learning_rate', 0.01)
+        self.learning_rate = self._validate_learning_rate(raw_learning_rate)
+        
+        raw_initial_const = self.config.get('initial_const', 1e-3)
+        self.initial_const = self._validate_const(raw_initial_const)
+        
         self.max_iterations = self.config.get('max_iterations', 100)
-        self.learning_rate = self.config.get('learning_rate', 0.01)
         self.binary_search_steps = self.config.get('binary_search_steps', 9)
-        self.initial_const = self.config.get('initial_const', 1e-3)
         self.abort_early = self.config.get('abort_early', True)
         self.device = self.config.get('device', 'cpu')
         
@@ -49,6 +63,66 @@ class CarliniWagnerL2:
         
         self.model.eval()
         self.model.to(self.device)
+    
+    @staticmethod
+    def _validate_confidence(confidence: float) -> float:
+        """Validate confidence parameter"""
+        import math
+        
+        if isinstance(confidence, float) and (math.isnan(confidence) or math.isinf(confidence)):
+            raise ValueError(f"Invalid confidence: NaN/Inf not allowed (got {confidence})")
+        
+        try:
+            confidence = float(confidence)
+        except (TypeError, ValueError):
+            raise ValueError(f"Invalid confidence: must be a number, got {type(confidence)}")
+        
+        if confidence < CarliniWagnerL2.MIN_CONFIDENCE:
+            raise ValueError(f"Invalid confidence: must be >= 0, got {confidence}")
+        
+        if confidence > CarliniWagnerL2.MAX_CONFIDENCE:
+            raise ValueError(f"Invalid confidence: excessively high value (got {confidence})")
+        
+        return confidence
+    
+    @staticmethod
+    def _validate_learning_rate(learning_rate: float) -> float:
+        """Validate learning rate parameter"""
+        import math
+        
+        if isinstance(learning_rate, float) and (math.isnan(learning_rate) or math.isinf(learning_rate)):
+            raise ValueError(f"Invalid learning_rate: NaN/Inf not allowed (got {learning_rate})")
+        
+        try:
+            learning_rate = float(learning_rate)
+        except (TypeError, ValueError):
+            raise ValueError(f"Invalid learning_rate: must be a number, got {type(learning_rate)}")
+        
+        if learning_rate <= 0:
+            raise ValueError(f"Invalid learning_rate: must be positive, got {learning_rate}")
+        
+        if learning_rate > CarliniWagnerL2.MAX_LEARNING_RATE:
+            raise ValueError(f"Invalid learning_rate: too large (got {learning_rate})")
+        
+        return learning_rate
+    
+    @staticmethod
+    def _validate_const(const: float) -> float:
+        """Validate const parameter"""
+        import math
+        
+        if isinstance(const, float) and (math.isnan(const) or math.isinf(const)):
+            raise ValueError(f"Invalid const: NaN/Inf not allowed (got {const})")
+        
+        try:
+            const = float(const)
+        except (TypeError, ValueError):
+            raise ValueError(f"Invalid const: must be a number, got {type(const)}")
+        
+        if const <= 0:
+            raise ValueError(f"Invalid const: must be positive, got {const}")
+        
+        return const
         
     def _tanh_space(self, x: torch.Tensor, boxmin: float, boxmax: float) -> torch.Tensor:
         """Transform to tanh space to handle box constraints"""
