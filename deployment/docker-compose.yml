@@ -12,6 +12,7 @@ services:
       - ENVIRONMENT=development
       - SECURITY_LEVEL=enterprise
       - LOG_LEVEL=INFO
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-}  # Must be set in production with a strong random value (min 32 bytes hex)
     volumes:
       - ../reports:/app/reports
       - ../logs:/app/logs
