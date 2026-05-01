@@ -1,10 +1,9 @@
 ```
 # Compiled Python files
-__pycache__/
 *.pyc
-*.pyo
-*.pyd
+__pycache__/
 
-# Security tool specific
-firewall/__pycache__/
+# Logs
+*.log
+reports/logs/
 ```
