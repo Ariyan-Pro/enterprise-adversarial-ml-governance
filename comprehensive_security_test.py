@@ -385,30 +385,35 @@ class ComprehensiveSecurityTester:
     def test_jwt_manipulation(self):
         """Test JWT token manipulation attacks"""
         
-        # Test weak secret keys
+        # Test weak secret keys - Check if server's JWT_SECRET_KEY is weak
+        # This tests if the SERVER is using a weak secret, not local JWT functionality
+        server_secret = os.environ.get("JWT_SECRET_KEY", "")
+        is_weak = server_secret in self.weak_secrets or len(server_secret) < 32
+        
         for weak_secret in self.weak_secrets:
-            try:
-                payload = {"sub": "admin", "role": "admin"}
-                token = jwt.encode(payload, weak_secret, algorithm=self.JWT_ALGORITHM)
-                try:
-                    decoded = jwt.decode(token, weak_secret, algorithms=[self.JWT_ALGORITHM])
-                    self.record_result(
-                        f"Weak secret detection ('{weak_secret}')",
-                        False,
-                        f"Token signed with weak secret '{weak_secret}'",
-                        "critical"
-                    )
-                except:
-                    pass
-            except:
-                pass
+            # This demonstrates what would happen IF the server used a weak secret
+            # The test passes if the server secret is NOT weak
+            payload = {"sub": "admin", "role": "admin"}
+            token = jwt.encode(payload, weak_secret, algorithm=self.JWT_ALGORITHM)
+            decoded = jwt.decode(token, weak_secret, algorithms=[self.JWT_ALGORITHM])
+            # We're documenting the risk, not claiming the server is vulnerable
+            pass
         
         self.record_result(
             "Weak secret dictionary test",
-            True,
-            f"Tested {len(self.weak_secrets)} common weak secrets",
-            "critical"
+            not is_weak,
+            f"Server JWT secret strength: {'WEAK - Using default/short secret!' if is_weak else 'STRONG - Using secure random secret'}",
+            "critical" if is_weak else "info"
         )
+        
+        if is_weak:
+            for weak_secret in self.weak_secrets:
+                self.record_result(
+                    f"⚠️ Vulnerable to weak secret '{weak_secret}'",
+                    False,
+                    f"Server uses weak secret! Change JWT_SECRET_KEY environment variable.",
+                    "critical"
+                )
         
         # Test key confusion attack (RS256 -> HS256)
         self.record_result(

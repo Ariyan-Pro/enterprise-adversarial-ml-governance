@@ -1,54 +1,17 @@
 ```
-# Docker related
-.dockerenv
-docker-compose*.yml
-!docker-compose.yml
-
-# Dependencies
-node_modules/
-venv/
-.venv/
+# Compiled Python files
 __pycache__/
-*.egg-info/
-dist/
-build/
-target/
-.gradle/
+*.pyc
+*.pyo
+*.pyd
 
-# Logs and temp files
+# Logs and temporary files
 *.log
 *.tmp
 *.swp
-*.swo
 
-# Environment
+# Environment files
 .env
 .env.local
 *.env.*
-
-# Editors
-.vscode/
-.idea/
-*.pyc
-*.class
-*.o
-*.exe
-*.dll
-*.so
-*.a
-*.obj
-*.out
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# Coverage reports
-coverage/
-htmlcov/
-.coverage
-
-# Python specific
-.mypy_cache/
-.pytest_cache/
 ```
