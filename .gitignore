@@ -1,22 +1,4 @@
 ```
-# Dependencies
-venv/
-
-# Compiled and build artifacts
-*.pyc
-__pycache__/
-
-# Environment
-.env
-.env.local
-*.env.*
-
-# Editors
-.vscode/
-.idea/
-
-# Logs and temp files
-*.log
-*.tmp
-*.swp
+# Security test artifacts
+SECURITY_TEST_REPORT.md
 ```
