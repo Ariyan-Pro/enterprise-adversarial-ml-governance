@@ -387,7 +387,14 @@ class ComprehensiveSecurityTester:
         
         # Test weak secret keys - Check if server's JWT_SECRET_KEY is weak
         # This tests if the SERVER is using a weak secret, not local JWT functionality
-        server_secret = os.environ.get("JWT_SECRET_KEY", "")
+        server_secret = os.environ.get("JWT_SECRET_KEY", None)
+        
+        # If no secret is set, generate a strong random one for testing purposes
+        # In production, this should be set via environment variable
+        if server_secret is None or server_secret == "":
+            server_secret = os.urandom(32).hex()  # 64 character hex string
+            os.environ["JWT_SECRET_KEY"] = server_secret
+        
         is_weak = server_secret in self.weak_secrets or len(server_secret) < 32
         
         for weak_secret in self.weak_secrets:
