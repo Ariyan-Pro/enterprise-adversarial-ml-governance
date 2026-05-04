@@ -136,13 +136,21 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS
+# CORS - Secure configuration with explicit allowed origins
+# Never use wildcard (*) with allow_credentials=True as it enables CSRF attacks
+CORS_ALLOWED_ORIGINS = os.environ.get(
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:3000,http://localhost:8080"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure properly in production
+    allow_origins=CORS_ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Window", "X-RateLimit-Remaining"],
+    max_age=600,  # Cache preflight results for 10 minutes
 )
 
 def get_client_identifier(request: Request) -> str:
