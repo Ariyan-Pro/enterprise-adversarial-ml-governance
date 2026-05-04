@@ -11,6 +11,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from collections import defaultdict
 import time
+import json
+import threading
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent
@@ -80,8 +82,36 @@ audit_logger = None
 RATE_LIMIT_REQUESTS = 100  # Maximum requests per window
 RATE_LIMIT_WINDOW_SECONDS = 60  # Time window in seconds
 
-# In-memory rate limit storage (use Redis in production)
-rate_limit_storage = defaultdict(list)
+# Persistent rate limit storage file path
+RATE_LIMIT_STORAGE_FILE = Path(__file__).parent.parent / "config" / "rate_limits.json"
+rate_limit_storage_lock = threading.Lock()
+
+def load_rate_limit_storage() -> defaultdict:
+    """Load rate limit state from persistent storage on startup"""
+    storage = defaultdict(list)
+    if RATE_LIMIT_STORAGE_FILE.exists():
+        try:
+            with open(RATE_LIMIT_STORAGE_FILE, 'r') as f:
+                data = json.load(f)
+                for client_id, timestamps in data.items():
+                    storage[client_id] = timestamps
+            logger.info(f"✅ Loaded rate limit storage from {RATE_LIMIT_STORAGE_FILE}")
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"⚠️ Failed to load rate limit storage: {e}. Starting fresh.")
+    return storage
+
+def save_rate_limit_storage(storage: defaultdict):
+    """Save rate limit state to persistent storage"""
+    try:
+        # Ensure config directory exists
+        RATE_LIMIT_STORAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(RATE_LIMIT_STORAGE_FILE, 'w') as f:
+            json.dump(dict(storage), f)
+    except IOError as e:
+        logger.error(f"❌ Failed to save rate limit storage: {e}")
+
+# In-memory rate limit storage (persisted to disk for restart resilience)
+rate_limit_storage = load_rate_limit_storage()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -120,6 +150,10 @@ async def lifespan(app: FastAPI):
         raise
     
     yield
+    
+    # Shutdown - persist rate limit state before exit
+    logger.info("💾 Persisting rate limit state before shutdown...")
+    save_rate_limit_storage(rate_limit_storage)
     
     # Shutdown
     logger.info("🛑 ENTERPRISE SECURITY API SHUTDOWN")
@@ -191,36 +225,43 @@ def check_rate_limit(client_id: str) -> tuple[bool, Dict[str, Any]]:
     current_time = time.time()
     window_start = current_time - RATE_LIMIT_WINDOW_SECONDS
     
-    # Clean up old entries and count recent requests
-    recent_requests = [
-        ts for ts in rate_limit_storage[client_id]
-        if ts > window_start
-    ]
-    
-    # Update storage with cleaned list
-    rate_limit_storage[client_id] = recent_requests
-    
-    # Check if limit exceeded
-    if len(recent_requests) >= RATE_LIMIT_REQUESTS:
-        oldest_request = min(recent_requests) if recent_requests else current_time
-        retry_after = int(oldest_request + RATE_LIMIT_WINDOW_SECONDS - current_time) + 1
-        return False, {
-            "retry_after": max(1, retry_after),
+    with rate_limit_storage_lock:
+        # Clean up old entries and count recent requests
+        recent_requests = [
+            ts for ts in rate_limit_storage[client_id]
+            if ts > window_start
+        ]
+        
+        # Update storage with cleaned list
+        rate_limit_storage[client_id] = recent_requests
+        
+        # Check if limit exceeded
+        if len(recent_requests) >= RATE_LIMIT_REQUESTS:
+            oldest_request = min(recent_requests) if recent_requests else current_time
+            retry_after = int(oldest_request + RATE_LIMIT_WINDOW_SECONDS - current_time) + 1
+            # Persist state after modification
+            save_rate_limit_storage(rate_limit_storage)
+            return False, {
+                "retry_after": max(1, retry_after),
+                "limit": RATE_LIMIT_REQUESTS,
+                "window_seconds": RATE_LIMIT_WINDOW_SECONDS,
+                "remaining": 0
+            }
+        
+        # Record this request
+        rate_limit_storage[client_id].append(current_time)
+        remaining = RATE_LIMIT_REQUESTS - len(rate_limit_storage[client_id])
+        
+        # Persist state periodically (every 10 requests to balance performance and durability)
+        if len(rate_limit_storage[client_id]) % 10 == 0:
+            save_rate_limit_storage(rate_limit_storage)
+        
+        return True, {
             "limit": RATE_LIMIT_REQUESTS,
             "window_seconds": RATE_LIMIT_WINDOW_SECONDS,
-            "remaining": 0
+            "remaining": remaining,
+            "reset": int(current_time + RATE_LIMIT_WINDOW_SECONDS)
         }
-    
-    # Record this request
-    rate_limit_storage[client_id].append(current_time)
-    remaining = RATE_LIMIT_REQUESTS - len(rate_limit_storage[client_id])
-    
-    return True, {
-        "limit": RATE_LIMIT_REQUESTS,
-        "window_seconds": RATE_LIMIT_WINDOW_SECONDS,
-        "remaining": remaining,
-        "reset": int(current_time + RATE_LIMIT_WINDOW_SECONDS)
-    }
 
 
 @app.middleware("http")
