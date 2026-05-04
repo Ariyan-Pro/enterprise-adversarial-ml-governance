@@ -76,6 +76,16 @@ class ModelFirewall:
             
             input_data = data["input"]
             
+            # Block boolean inputs immediately (they should not be model inputs)
+            if isinstance(input_data, bool):
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason="Boolean values are not valid model inputs",
+                    confidence=1.0,
+                    details={"check": "input_sanity", "issue": "boolean_input"}
+                )
+            
             # Convert to tensor for analysis
             if isinstance(input_data, list):
                 tensor = torch.tensor(input_data, dtype=torch.float32)
