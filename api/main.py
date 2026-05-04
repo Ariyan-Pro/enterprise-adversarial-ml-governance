@@ -136,13 +136,28 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS
+# CORS - Restrictive policy for production security
+# Configure allowed origins via environment variable in production
+ALLOWED_ORIGINS = os.environ.get(
+    "ALLOWED_ORIGINS",
+    "http://localhost:3000,http://localhost:8000"  # Default for development only
+).split(",")
+
+# Validate that wildcard is not used when credentials are enabled
+if "*" in ALLOWED_ORIGINS and len(ALLOWED_ORIGINS) == 1:
+    logger.warning(
+        "⚠️ SECURITY WARNING: Wildcard CORS origin detected with allow_credentials=True. "
+        "This is a critical security vulnerability. Setting specific origins instead."
+    )
+    # Force safe defaults if wildcard is detected
+    ALLOWED_ORIGINS = ["http://localhost:3000", "http://localhost:8000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure properly in production
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
 )
 
 def get_client_identifier(request: Request) -> str:
