@@ -23,10 +23,10 @@ class DatabaseConfig:
     host: str = os.getenv("DB_HOST", "localhost")
     port: int = int(os.getenv("DB_PORT", "5432"))
     database: str = os.getenv("DB_NAME", "security_nervous_system")
-    user: str = os.getenv("DB_USER", "postgres")
-    password: str = os.getenv("DB_PASSWORD", "postgres")
+    user: str = os.getenv("DB_USER")
+    password: str = os.getenv("DB_PASSWORD")
     
-    # Connection pooling
+    # Connection pooling - must come after required fields
     pool_size: int = 5
     max_overflow: int = 10
     pool_timeout: int = 30
@@ -39,6 +39,19 @@ class DatabaseConfig:
     # Reliability
     retry_attempts: int = 3
     retry_delay: float = 1.0
+    
+    def __post_init__(self):
+        """Validate required credentials are set"""
+        if not self.user:
+            raise ValueError(
+                "DB_USER environment variable is required. "
+                "Default credentials are not allowed for security."
+            )
+        if not self.password:
+            raise ValueError(
+                "DB_PASSWORD environment variable is required. "
+                "Default credentials are not allowed for security."
+            )
     
     @property
     def connection_string(self) -> str:
@@ -287,27 +300,50 @@ class DatabaseConstraintError(DatabaseError):
 # DEFAULT CONFIGURATION
 # ============================================================================
 
-# Global database configuration
-DATABASE_CONFIG = DatabaseConfig()
+def get_database_config() -> DatabaseConfig:
+    """
+    Get database configuration from environment variables.
+    Raises ValueError if required credentials are not set.
+    """
+    return DatabaseConfig()
 
-# Initialize session manager
-SESSION_MANAGER = DatabaseSessionManager(DATABASE_CONFIG)
+# Global database configuration (lazy initialization)
+_DATABASE_CONFIG = None
+_SESSION_MANAGER = None
+
+def get_config() -> DatabaseConfig:
+    """Get or create database configuration"""
+    global _DATABASE_CONFIG
+    if _DATABASE_CONFIG is None:
+        _DATABASE_CONFIG = get_database_config()
+    return _DATABASE_CONFIG
+
+def get_session_manager() -> DatabaseSessionManager:
+    """Get or create session manager"""
+    global _SESSION_MANAGER
+    if _SESSION_MANAGER is None:
+        _SESSION_MANAGER = DatabaseSessionManager(get_config())
+    return _SESSION_MANAGER
 
 def init_database() -> bool:
     """Initialize database connection"""
-    return SESSION_MANAGER.initialize()
+    return get_session_manager().initialize()
 
 def get_db_session():
     """Get database session (use in FastAPI dependency)"""
-    return SESSION_MANAGER.get_session()
+    return get_session_manager().get_session()
 
 def get_database_health() -> dict:
     """Get database health status"""
-    return SESSION_MANAGER.health_monitor.get_metrics()
+    return get_session_manager().health_monitor.get_metrics()
 
 def shutdown_database():
     """Shutdown database connections"""
-    SESSION_MANAGER.close()
+    global _SESSION_MANAGER, _DATABASE_CONFIG
+    if _SESSION_MANAGER:
+        _SESSION_MANAGER.close()
+    _SESSION_MANAGER = None
+    _DATABASE_CONFIG = None
 
 
 

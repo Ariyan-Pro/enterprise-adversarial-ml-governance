@@ -12,8 +12,17 @@ sys.path.insert(0, str(project_root))
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 
-from database.config import DATABASE_CONFIG, init_database
+from database.config import get_config, init_database, get_db_session
 from database.models.base import Base
+
+def _get_config():
+    """Get database config with error handling"""
+    try:
+        return get_config()
+    except ValueError as e:
+        print(f"⚠️  Database configuration error: {e}")
+        print("💡 Using SQLite fallback for initialization")
+        return None
 
 # Import all 7 models
 from database.models.deployment_identity import DeploymentIdentity
@@ -26,34 +35,41 @@ from database.models.system_health_history import SystemHealthHistory
 
 def create_database():
     """Create database if it doesn't exist"""
+    config = _get_config()
+    
+    # If no PostgreSQL config, skip database creation (will use SQLite)
+    if config is None:
+        print("⚠️  Skipping PostgreSQL database creation (using SQLite)")
+        return True
+    
     try:
         # First, connect to default PostgreSQL database
-        admin_engine = create_engine(DATABASE_CONFIG.test_connection_string)
+        admin_engine = create_engine(config.test_connection_string)
         
         with admin_engine.connect() as conn:
             # Check if database exists
             result = conn.execute(
                 text("SELECT 1 FROM pg_database WHERE datname = :dbname"),
-                {"dbname": DATABASE_CONFIG.database}
+                {"dbname": config.database}
             ).fetchone()
             
             if not result:
-                print(f"Creating database: {DATABASE_CONFIG.database}")
+                print(f"Creating database: {config.database}")
                 conn.execute(text("COMMIT"))  # Exit transaction
                 # Use identifier-safe quoting for database name to prevent SQL injection
-                db_name = DATABASE_CONFIG.database.replace('"', '""')
+                db_name = config.database.replace('"', '""')
                 conn.execute(text(f'CREATE DATABASE "{db_name}"'))
                 print("✅ Database created")
             else:
-                print(f"✅ Database already exists: {DATABASE_CONFIG.database}")
+                print(f"✅ Database already exists: {config.database}")
                 
     except OperationalError as e:
         print(f"❌ Failed to connect to PostgreSQL: {e}")
         print("\n🔧 TROUBLESHOOTING:")
         print("   1. Install PostgreSQL: https://www.postgresql.org/download/")
-        print("   2. Or use Docker: docker run --name security-db -p 5432:5432 -e POSTGRES_PASSWORD=postgres -d postgres")
+        print("   2. Or use Docker: docker run --name security-db -p 5432:5432 -e POSTGRES_PASSWORD=<secure_password> -d postgres")
         print("   3. Verify PostgreSQL service is running")
-        print("   4. Update credentials in database/config.py if needed")
+        print("   4. Set environment variables: DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME")
         return False
     
     return True
@@ -66,8 +82,22 @@ def create_tables():
             print("❌ Failed to initialize database connection")
             return False
         
+        # Get configuration
+        config = _get_config()
+        
+        # If using SQLite fallback, use SQLite engine
+        if config is None:
+            from database.connection import get_engine
+            engine = get_engine()
+            if engine is None:
+                print("❌ No database engine available")
+                return False
+        else:
+            from database.config import get_session_manager
+            engine = get_session_manager()._engine
+        
         # Create all tables
-        Base.metadata.create_all(bind=DATABASE_CONFIG.engine)
+        Base.metadata.create_all(bind=engine)
         print("✅ All tables created successfully")
         
         # Count tables created
@@ -75,7 +105,7 @@ def create_tables():
         print(f"📊 Tables created: {table_count}")
         
         # List all tables
-        with DATABASE_CONFIG.engine.connect() as conn:
+        with engine.connect() as conn:
             result = conn.execute(text("""
                 SELECT table_name 
                 FROM information_schema.tables 

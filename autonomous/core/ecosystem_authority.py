@@ -14,7 +14,6 @@ from enum import Enum
 import warnings
 
 from autonomous.core.database_engine import DatabaseAwareEngine
-from database.config import DATABASE_CONFIG
 
 class DomainType(Enum):
     """ML Domain Types"""

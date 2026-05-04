@@ -14,7 +14,16 @@ import sys
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from database.config import DATABASE_CONFIG
+from database.config import get_config, DatabaseConfig
+
+def _get_database_config() -> DatabaseConfig:
+    """Get database configuration with error handling"""
+    try:
+        return get_config()
+    except ValueError as e:
+        print(f"⚠️  Database configuration error: {e}")
+        print("💡 Falling back to SQLite")
+        return None
 
 class MockSession:
     """
@@ -102,26 +111,29 @@ def create_sqlite_engine():
 def create_postgresql_engine():
     """Create PostgreSQL engine for production"""
     try:
+        # Get database configuration
+        config = _get_database_config()
+        
         # Check if we have PostgreSQL config
-        if not hasattr(DATABASE_CONFIG, 'host'):
+        if config is None or not hasattr(config, 'host'):
             print("⚠️  PostgreSQL not configured, using SQLite")
             return create_sqlite_engine()
             
         # Build PostgreSQL connection URL
         db_url = (
-            f"postgresql://{DATABASE_CONFIG.user}:{DATABASE_CONFIG.password}"
-            f"@{DATABASE_CONFIG.host}:{DATABASE_CONFIG.port}/{DATABASE_CONFIG.database}"
+            f"postgresql://{config.user}:{config.password}"
+            f"@{config.host}:{config.port}/{config.database}"
         )
         
         engine = create_engine(
             db_url,
-            pool_size=DATABASE_CONFIG.pool_size,
-            max_overflow=DATABASE_CONFIG.max_overflow,
+            pool_size=config.pool_size,
+            max_overflow=config.max_overflow,
             pool_recycle=3600,
-            echo=DATABASE_CONFIG.get('echo', False)
+            echo=config.get('echo', False)
         )
         
-        print(f"✅ PostgreSQL engine created for {DATABASE_CONFIG.database}")
+        print(f"✅ PostgreSQL engine created for {config.database}")
         return engine
         
     except Exception as e:
