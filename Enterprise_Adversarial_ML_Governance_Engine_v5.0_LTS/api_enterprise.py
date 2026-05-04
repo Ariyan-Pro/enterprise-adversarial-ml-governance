@@ -79,7 +79,10 @@ async def health_check():
             health["ecosystem"] = ecosystem_health
             health["components"]["database_memory"] = "operational"
         except Exception as e:
-            health["ecosystem"] = {"status": "error", "message": str(e)}
+            # Log full error internally but return generic message to avoid leaking sensitive info
+            import logging
+            logging.error(f"Ecosystem health check failed: {e}")
+            health["ecosystem"] = {"status": "error", "message": "Internal error occurred"}
             health["components"]["database_memory"] = "degraded"
     
     return JSONResponse(content=health)
@@ -94,7 +97,10 @@ async def ecosystem_status():
         health = phase5_engine.get_ecosystem_health()
         return health
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ecosystem check failed: {str(e)}")
+        # Log full error internally but return generic message to avoid leaking sensitive info
+        import logging
+        logging.error(f"Ecosystem status check failed: {e}")
+        raise HTTPException(status_code=500, detail="Ecosystem check failed")
 
 @app.post("/api/predict")
 async def predict(data: Dict[str, Any]):
