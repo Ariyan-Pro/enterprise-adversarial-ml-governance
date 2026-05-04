@@ -45,21 +45,34 @@ security = HTTPBearer()
 # The JWT secret MUST be set via environment variable in production
 # Never use runtime-generated secrets as they cause token invalidation on restart
 JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
+
+# Check if running in production mode
+IS_PRODUCTION = os.environ.get("ENVIRONMENT", "development").lower() == "production"
+
 if not JWT_SECRET_KEY:
-    # In development only: generate and warn (never use in production)
-    import warnings
-    JWT_SECRET_KEY = os.urandom(32).hex()
-    warnings.warn(
-        "⚠️ SECURITY WARNING: JWT_SECRET_KEY not set in environment. "
-        "Using runtime-generated secret. This will invalidate all tokens on restart. "
-        "SET JWT_SECRET_KEY environment variable in production!",
-        RuntimeWarning,
-        stacklevel=2
-    )
-    logger.warning(
-        "⚠️ INSECURE: JWT_SECRET_KEY not configured. Using runtime-generated secret. "
-        "Set JWT_SECRET_KEY environment variable for production deployments."
-    )
+    if IS_PRODUCTION:
+        # CRITICAL: Fail startup in production if JWT_SECRET_KEY is not set
+        raise RuntimeError(
+            "🚨 CRITICAL SECURITY ERROR: JWT_SECRET_KEY is not set! "
+            "This is required for production deployments. "
+            "Set the JWT_SECRET_KEY environment variable before starting the server. "
+            "Generate a secure key with: python -c 'import secrets; print(secrets.token_hex(32))'"
+        )
+    else:
+        # In development only: generate and warn (never use in production)
+        import warnings
+        JWT_SECRET_KEY = os.urandom(32).hex()
+        warnings.warn(
+            "⚠️ SECURITY WARNING: JWT_SECRET_KEY not set in environment. "
+            "Using runtime-generated secret. This will invalidate all tokens on restart. "
+            "SET JWT_SECRET_KEY environment variable in production!",
+            RuntimeWarning,
+            stacklevel=2
+        )
+        logger.warning(
+            "⚠️ INSECURE: JWT_SECRET_KEY not configured. Using runtime-generated secret. "
+            "Set JWT_SECRET_KEY environment variable for production deployments."
+        )
 
 # Validate JWT secret key strength (must be at least 32 bytes/64 hex chars)
 if len(JWT_SECRET_KEY) < 64:
@@ -528,7 +541,7 @@ def validate_credentials(username: str, password: str) -> bool:
     """
     Validate user credentials against secure identity provider.
     
-    In production, replace this with actual credential validation:
+    Supports multiple authentication backends:
     - LDAP/Active Directory lookup
     - OAuth2/OIDC provider validation
     - Database lookup with hashed passwords (bcrypt, argon2)
@@ -540,34 +553,205 @@ def validate_credentials(username: str, password: str) -> bool:
         
     Returns:
         bool: True if credentials are valid, False otherwise
+        
+    Raises:
+        RuntimeError: If no authentication backend is configured
     """
-    # TODO: Replace with actual credential validation against your IDP
-    # Example implementations:
-    # 
-    # 1. LDAP/AD Validation:
-    #    from ldap3 import Server, Connection, ALL
-    #    server = Server('ldap://your-ad-server', get_info=ALL)
-    #    conn = Connection(server, user=username, password=password)
-    #    return conn.bind()
-    #
-    # 2. Database Validation (with bcrypt):
-    #    import bcrypt
-    #    hashed = db.get_password_hash(username)
-    #    return bcrypt.checkpw(password.encode(), hashed)
-    #
-    # 3. OAuth2/OIDC Validation:
-    #    from authlib.integrations.requests_client import OAuth2Session
-    #    client = OAuth2Session(client_id, client_secret)
-    #    token = client.fetch_token(token_endpoint, username=username, password=password)
-    #    return 'access_token' in token
+    # Determine authentication backend from environment
+    auth_backend = os.environ.get("AUTH_BACKEND", "").lower()
     
-    # SECURITY WARNING: This is a placeholder - NEVER use in production!
-    # Proper credential validation MUST be implemented before deployment.
-    raise NotImplementedError(
-        "Credential validation not implemented. "
-        "Please configure your identity provider (LDAP, OAuth2, database) "
-        "before using this endpoint in production."
-    )
+    if not auth_backend:
+        logger.error(
+            "🚨 SECURITY ERROR: No authentication backend configured! "
+            "Set AUTH_BACKEND environment variable to one of: ldap, oauth2, database"
+        )
+        raise RuntimeError(
+            "Authentication backend not configured. "
+            "Please set AUTH_BACKEND environment variable to 'ldap', 'oauth2', or 'database' "
+            "and configure the corresponding settings before using this endpoint."
+        )
+    
+    try:
+        if auth_backend == "ldap":
+            return _validate_ldap_credentials(username, password)
+        elif auth_backend == "oauth2":
+            return _validate_oauth2_credentials(username, password)
+        elif auth_backend == "database":
+            return _validate_database_credentials(username, password)
+        else:
+            logger.error(f"Unknown authentication backend: {auth_backend}")
+            raise ValueError(f"Unsupported authentication backend: {auth_backend}")
+    except Exception as e:
+        logger.error(f"Credential validation failed for backend '{auth_backend}': {e}")
+        raise
+
+
+def _validate_ldap_credentials(username: str, password: str) -> bool:
+    """
+    Validate credentials against LDAP/Active Directory.
+    
+    Required environment variables:
+    - LDAP_SERVER: LDAP server URL (e.g., ldap://ad.example.com)
+    - LDAP_BASE_DN: Base DN for searches (e.g., dc=example,dc=com)
+    - LDAP_USER_DN_TEMPLATE: DN template for user binding (e.g., cn={username},ou=users,dc=example,dc=com)
+    """
+    try:
+        from ldap3 import Server, Connection, ALL, NTLM
+    except ImportError:
+        logger.error("ldap3 library not installed. Install with: pip install ldap3")
+        raise RuntimeError("LDAP authentication requires ldap3 library. Install with: pip install ldap3")
+    
+    ldap_server = os.environ.get("LDAP_SERVER")
+    ldap_base_dn = os.environ.get("LDAP_BASE_DN")
+    ldap_user_dn_template = os.environ.get("LDAP_USER_DN_TEMPLATE")
+    
+    if not all([ldap_server, ldap_base_dn, ldap_user_dn_template]):
+        logger.error("Missing required LDAP configuration environment variables")
+        raise RuntimeError(
+            "LDAP configuration incomplete. Required: LDAP_SERVER, LDAP_BASE_DN, LDAP_USER_DN_TEMPLATE"
+        )
+    
+    try:
+        # Connect to LDAP server
+        server = Server(ldap_server, get_info=ALL)
+        
+        # Format user DN
+        user_dn = ldap_user_dn_template.format(username=username)
+        
+        # Attempt to bind with user credentials
+        conn = Connection(server, user=user_dn, password=password, authentication=NTLM if 'ntlm' in os.environ.get('LDAP_AUTH_TYPE', '').lower() else None)
+        
+        if conn.bind():
+            logger.info(f"✅ LDAP authentication successful for user: {username}")
+            conn.unbind()
+            return True
+        else:
+            logger.warning(f"Failed LDAP authentication for user: {username}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"LDAP authentication error: {e}")
+        raise
+
+
+def _validate_oauth2_credentials(username: str, password: str) -> bool:
+    """
+    Validate credentials against OAuth2/OIDC provider.
+    
+    Required environment variables:
+    - OAUTH2_CLIENT_ID: OAuth2 client ID
+    - OAUTH2_CLIENT_SECRET: OAuth2 client secret
+    - OAUTH2_TOKEN_ENDPOINT: Token endpoint URL
+    - OAUTH2_GRANT_TYPE: Grant type (default: password)
+    """
+    try:
+        import requests
+    except ImportError:
+        logger.error("requests library not installed. Install with: pip install requests")
+        raise RuntimeError("OAuth2 authentication requires requests library")
+    
+    client_id = os.environ.get("OAUTH2_CLIENT_ID")
+    client_secret = os.environ.get("OAUTH2_CLIENT_SECRET")
+    token_endpoint = os.environ.get("OAUTH2_TOKEN_ENDPOINT")
+    grant_type = os.environ.get("OAUTH2_GRANT_TYPE", "password")
+    
+    if not all([client_id, client_secret, token_endpoint]):
+        logger.error("Missing required OAuth2 configuration environment variables")
+        raise RuntimeError(
+            "OAuth2 configuration incomplete. Required: OAUTH2_CLIENT_ID, OAUTH2_CLIENT_SECRET, OAUTH2_TOKEN_ENDPOINT"
+        )
+    
+    try:
+        response = requests.post(
+            token_endpoint,
+            data={
+                "grant_type": grant_type,
+                "username": username,
+                "password": password,
+                "client_id": client_id,
+                "client_secret": client_secret
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            token_data = response.json()
+            if "access_token" in token_data:
+                logger.info(f"✅ OAuth2 authentication successful for user: {username}")
+                return True
+        
+        logger.warning(f"Failed OAuth2 authentication for user: {username} - Status: {response.status_code}")
+        return False
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"OAuth2 request error: {e}")
+        raise
+
+
+def _validate_database_credentials(username: str, password: str) -> bool:
+    """
+    Validate credentials against database with hashed passwords.
+    Uses bcrypt for password hashing verification.
+    
+    Required environment variables:
+    - DATABASE_URL: Database connection string (e.g., postgresql://user:pass@host/db)
+    - DB_PASSWORD_TABLE: Table name containing user credentials (default: users)
+    - DB_USERNAME_COLUMN: Column name for username (default: username)
+    - DB_PASSWORD_COLUMN: Column name for password hash (default: password_hash)
+    """
+    try:
+        import bcrypt
+    except ImportError:
+        logger.error("bcrypt library not installed. Install with: pip install bcrypt")
+        raise RuntimeError("Database authentication requires bcrypt library")
+    
+    try:
+        from sqlalchemy import create_engine, text
+    except ImportError:
+        logger.error("sqlalchemy library not installed. Install with: pip install sqlalchemy")
+        raise RuntimeError("Database authentication requires sqlalchemy library")
+    
+    database_url = os.environ.get("DATABASE_URL")
+    password_table = os.environ.get("DB_PASSWORD_TABLE", "users")
+    username_column = os.environ.get("DB_USERNAME_COLUMN", "username")
+    password_column = os.environ.get("DB_PASSWORD_COLUMN", "password_hash")
+    
+    if not database_url:
+        logger.error("Missing required DATABASE_URL environment variable")
+        raise RuntimeError("Database configuration incomplete. Required: DATABASE_URL")
+    
+    try:
+        # Create database engine
+        engine = create_engine(database_url)
+        
+        with engine.connect() as conn:
+            # Query user's password hash
+            query = text(
+                f"SELECT {password_column} FROM {password_table} WHERE {username_column} = :username LIMIT 1"
+            )
+            result = conn.execute(query, {"username": username})
+            row = result.fetchone()
+            
+            if not row:
+                logger.warning(f"No user found in database: {username}")
+                return False
+            
+            stored_hash = row[0]
+            
+            # Verify password against stored hash
+            if isinstance(stored_hash, str):
+                stored_hash = stored_hash.encode('utf-8')
+            
+            if bcrypt.checkpw(password.encode('utf-8'), stored_hash):
+                logger.info(f"✅ Database authentication successful for user: {username}")
+                return True
+            else:
+                logger.warning(f"Invalid password for user: {username}")
+                return False
+                
+    except Exception as e:
+        logger.error(f"Database authentication error: {e}")
+        raise
 
 
 @app.post("/api/v1/auth/token")
