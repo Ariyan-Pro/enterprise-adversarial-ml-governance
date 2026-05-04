@@ -10,6 +10,7 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
 from enum import Enum
 import hashlib
+import re
 
 class RiskLevel(Enum):
     LOW = "low"
@@ -710,8 +711,17 @@ class EnterpriseAuditLogger:
         if request_id in self.audit_trail:
             return self.audit_trail[request_id]
         
-        # Try to load from disk
-        audit_file = self.audit_dir / f"{request_id}.json"
+        # Sanitize request_id to prevent path traversal
+        safe_request_id = self._sanitize_path_component(request_id)
+        audit_file = self.audit_dir / f"{safe_request_id}.json"
+        
+        # Ensure the resolved path is still within audit_dir
+        try:
+            audit_file.resolve().relative_to(self.audit_dir.resolve())
+        except ValueError:
+            # Path traversal attempt detected
+            return {}
+        
         if audit_file.exists():
             try:
                 with open(audit_file, "r") as f:
@@ -801,9 +811,46 @@ class EnterpriseAuditLogger:
         if request_id not in self.audit_trail:
             return
         
-        audit_file = self.audit_dir / f"{request_id}.json"
+        # Sanitize request_id to prevent path traversal
+        safe_request_id = self._sanitize_path_component(request_id)
+        audit_file = self.audit_dir / f"{safe_request_id}.json"
+        
+        # Ensure the resolved path is still within audit_dir
+        try:
+            audit_file.resolve().relative_to(self.audit_dir.resolve())
+        except ValueError:
+            # Path traversal attempt detected
+            return
+        
         with open(audit_file, "w") as f:
             json.dump(self.audit_trail[request_id], f, indent=2)
+    
+    def _sanitize_path_component(self, component: str) -> str:
+        """Sanitize a path component to prevent path traversal attacks.
+        
+        Removes or replaces dangerous characters that could be used for
+        path traversal (../, ..\\, absolute paths, etc.)
+        """
+        # Remove null bytes
+        component = component.replace('\x00', '')
+        
+        # Replace path separators with underscores
+        component = component.replace('/', '_').replace('\\', '_')
+        
+        # Remove parent directory references
+        component = re.sub(r'\.\.+', '_', component)
+        
+        # Only allow alphanumeric, hyphens, underscores, and dots (but not leading dots)
+        sanitized = re.sub(r'[^a-zA-Z0-9_.-]', '_', component)
+        
+        # Remove leading dots to prevent hidden files
+        sanitized = sanitized.lstrip('.')
+        
+        # Limit length to prevent filesystem issues
+        if len(sanitized) > 255:
+            sanitized = sanitized[:255]
+        
+        return sanitized or 'unknown'
     
     def _matches_filters(self, record: Dict, filters: Dict) -> bool:
         """Check if record matches search filters"""
