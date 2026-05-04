@@ -4,11 +4,15 @@ The firewall never relies on one signal.
 """
 import numpy as np
 import torch
+import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from enum import Enum
 import json
 from datetime import datetime
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 class FirewallAction(Enum):
     ALLOW = "allow"
