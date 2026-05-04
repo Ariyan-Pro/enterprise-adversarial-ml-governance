@@ -8,7 +8,6 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 import uuid
 
-from database.config import DATABASE_CONFIG
 from database.models.base import Base
 
 class DeploymentIdentity(Base):

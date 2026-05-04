@@ -23,8 +23,21 @@ class DatabaseConfig:
     host: str = os.getenv("DB_HOST", "localhost")
     port: int = int(os.getenv("DB_PORT", "5432"))
     database: str = os.getenv("DB_NAME", "security_nervous_system")
-    user: str = os.getenv("DB_USER", "postgres")
-    password: str = os.getenv("DB_PASSWORD", "postgres")
+    user: str = os.getenv("DB_USER")
+    password: str = os.getenv("DB_PASSWORD")
+    
+    def __post_init__(self):
+        """Validate required credentials are set"""
+        if not self.user:
+            raise ValueError(
+                "DB_USER environment variable is required. "
+                "Default credentials are not allowed for security."
+            )
+        if not self.password:
+            raise ValueError(
+                "DB_PASSWORD environment variable is required. "
+                "Default credentials are not allowed for security."
+            )
     
     # Connection pooling
     pool_size: int = 5
