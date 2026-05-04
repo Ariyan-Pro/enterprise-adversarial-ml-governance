@@ -87,11 +87,31 @@ def validate_string_input(value: str, field_name: str, max_length: int = MAX_STR
     if len(value) > max_length:
         raise InputValidationError(f"{field_name} exceeds maximum length of {max_length}")
     
-    # Sanitize potential SQL injection patterns
-    dangerous_patterns = [';', '--', '/*', '*/', 'DROP ', 'DELETE ', 'UPDATE ', 'INSERT ']
+    # Sanitize potential SQL injection patterns (comprehensive list)
+    dangerous_patterns = [
+        # SQL comment sequences
+        ';', '--', '/*', '*/', '#',
+        # SQL keywords (case-insensitive)
+        'DROP ', 'DELETE ', 'UPDATE ', 'INSERT ', 'SELECT ', 'UNION ',
+        'ALTER ', 'CREATE ', 'TRUNCATE ', 'EXEC ', 'EXECUTE ',
+        'XP_', 'SP_', 'WAITFOR ', 'BENCHMARK ', 'SLEEP ',
+        # SQL injection techniques
+        'OR 1=1', 'OR 1 = 1', 'AND 1=1', 'AND 1 = 1',
+        "' OR '", '" OR "', "' AND '", '" AND "',
+        # Union-based injection
+        'UNION SELECT', 'UNION ALL SELECT',
+        # Stacked queries
+        '; DROP', '; DELETE', '; UPDATE', '; INSERT',
+        # Time-based blind injection
+        'WAITFOR DELAY', 'BENCHMARK(', 'SLEEP(',
+        # Error-based injection
+        'EXTRACTVALUE(', 'UPDATEXML(',
+        # Out-of-band injection
+        'UTL_HTTP', 'HTTPURITYPE', 'DBMS_LDAP'
+    ]
     value_upper = value.upper()
     for pattern in dangerous_patterns:
-        if pattern in value_upper:
+        if pattern.upper() in value_upper:
             raise InputValidationError(f"{field_name} contains invalid characters")
     
     return value
@@ -101,6 +121,10 @@ def validate_confidence(value: float, field_name: str = "confidence") -> float:
     """Validate confidence value"""
     if value is None:
         raise InputValidationError(f"{field_name} cannot be None")
+    
+    # Explicitly reject booleans (bool is subclass of int in Python)
+    if isinstance(value, bool):
+        raise InputValidationError(f"{field_name} must be a number, not a boolean")
     
     if not isinstance(value, (int, float)):
         raise InputValidationError(f"{field_name} must be a number")
@@ -116,6 +140,10 @@ def validate_confidence_delta(value: float) -> float:
     if value is None:
         raise InputValidationError("confidence_delta cannot be None")
     
+    # Explicitly reject booleans (bool is subclass of int in Python)
+    if isinstance(value, bool):
+        raise InputValidationError("confidence_delta must be a number, not a boolean")
+    
     if not isinstance(value, (int, float)):
         raise InputValidationError("confidence_delta must be a number")
     
@@ -129,6 +157,10 @@ def validate_epsilon(value: float) -> float:
     """Validate epsilon (perturbation magnitude)"""
     if value is None:
         raise InputValidationError("epsilon cannot be None")
+    
+    # Explicitly reject booleans (bool is subclass of int in Python)
+    if isinstance(value, bool):
+        raise InputValidationError("epsilon must be a number, not a boolean")
     
     if not isinstance(value, (int, float)):
         raise InputValidationError("epsilon must be a number")

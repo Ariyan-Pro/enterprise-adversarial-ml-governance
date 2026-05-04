@@ -10,7 +10,7 @@ __pycache__/
 logs/
 
 # Dependencies
-.venv/
 venv/
-env/
+.venv/
+.env
 ```
