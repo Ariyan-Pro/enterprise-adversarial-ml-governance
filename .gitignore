@@ -1,5 +1,35 @@
-```
-# Security audit reports
-reports/SECURITY_AUDIT_DETAILED_REPORT.md
-reports/security_audit_report.json
+```gitignore
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Dependencies
+.venv/
+venv/
+env/
+.env
+.env.local
+.env.*
+
+# Logs
+*.log
+
+# Coverage
+.coverage
+coverage/
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# Build
+build/
+dist/
+*.egg-info/
 ```

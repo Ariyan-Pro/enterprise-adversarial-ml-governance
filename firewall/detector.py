@@ -1,4 +1,4 @@
-﻿"""
+"""
 🛡️ MODEL FIREWALL - Non-negotiable security core
 The firewall never relies on one signal.
 """
@@ -347,15 +347,151 @@ class ModelFirewall:
         )
     
     def _check_drift_indicators(self, request: Dict[str, Any]) -> FirewallResult:
-        """Check for data/model drift indicators"""
-        # TODO: Implement drift detection
-        return FirewallResult(
-            allowed=True,
-            action=FirewallAction.ALLOW,
-            reason="Drift check passed (placeholder)",
-            confidence=0.7,
-            details={"check": "drift_indicators", "status": "placeholder"}
-        )
+        """Check for data/model drift indicators using PSI (Population Stability Index)"""
+        try:
+            data = request.get("data", {})
+            
+            # Get current input features
+            if "input" not in data and "features" not in data:
+                return FirewallResult(
+                    allowed=True,
+                    action=FirewallAction.ALLOW,
+                    reason="No input data for drift check",
+                    confidence=0.5,
+                    details={"check": "drift_indicators", "status": "no_data"}
+                )
+            
+            input_data = data.get("input") or data.get("features")
+            
+            # Convert to numpy array
+            if isinstance(input_data, list):
+                current_features = np.array(input_data, dtype=np.float32)
+            elif isinstance(input_data, dict):
+                # Handle dictionary of features
+                current_features = np.array(list(input_data.values()), dtype=np.float32)
+            else:
+                current_features = np.array([input_data], dtype=np.float32)
+            
+            # Flatten if multi-dimensional
+            current_features = current_features.flatten()
+            
+            # Calculate PSI against reference distribution
+            psi_score = self._calculate_psi(current_features)
+            
+            # Drift thresholds based on PSI
+            # PSI < 0.1: No significant change
+            # PSI 0.1-0.2: Moderate change
+            # PSI > 0.2: Significant change (potential drift)
+            PSI_DRIFT_THRESHOLD = 0.2
+            PSI_WARNING_THRESHOLD = 0.1
+            
+            if psi_score > PSI_DRIFT_THRESHOLD:
+                logger.warning(f"⚠️ SIGNIFICANT DATA DRIFT DETECTED: PSI={psi_score:.4f}")
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason=f"Significant data drift detected (PSI={psi_score:.4f} > {PSI_DRIFT_THRESHOLD})",
+                    confidence=0.9,
+                    details={
+                        "check": "drift_indicators",
+                        "psi_score": float(psi_score),
+                        "threshold": PSI_DRIFT_THRESHOLD,
+                        "severity": "high"
+                    }
+                )
+            elif psi_score > PSI_WARNING_THRESHOLD:
+                logger.info(f"📊 MODERATE DATA DRIFT: PSI={psi_score:.4f}")
+                return FirewallResult(
+                    allowed=True,
+                    action=FirewallAction.ALLOW,
+                    reason=f"Moderate drift detected but within tolerance (PSI={psi_score:.4f})",
+                    confidence=0.7,
+                    details={
+                        "check": "drift_indicators",
+                        "psi_score": float(psi_score),
+                        "threshold": PSI_WARNING_THRESHOLD,
+                        "severity": "moderate"
+                    }
+                )
+            else:
+                return FirewallResult(
+                    allowed=True,
+                    action=FirewallAction.ALLOW,
+                    reason=f"No significant drift detected (PSI={psi_score:.4f})",
+                    confidence=0.95,
+                    details={
+                        "check": "drift_indicators",
+                        "psi_score": float(psi_score),
+                        "severity": "none"
+                    }
+                )
+                
+        except Exception as e:
+            logger.error(f"Drift detection error: {e}")
+            # Fail open - allow request but log error
+            return FirewallResult(
+                allowed=True,
+                action=FirewallAction.ALLOW,
+                reason=f"Drift check failed: {str(e)}",
+                confidence=0.3,
+                details={"check": "drift_indicators", "error": str(e)}
+            )
+    
+    def _calculate_psi(
+        self, 
+        current_features: np.ndarray, 
+        n_bins: int = 10,
+        epsilon: float = 1e-6
+    ) -> float:
+        """
+        Calculate Population Stability Index (PSI) between current and reference distribution.
+        
+        PSI measures how much the current feature distribution has shifted from the reference.
+        
+        Args:
+            current_features: Current input features
+            n_bins: Number of bins for discretization
+            epsilon: Small value to avoid division by zero
+            
+        Returns:
+            float: PSI score (higher = more drift)
+        """
+        # Initialize reference distribution if not exists
+        if not hasattr(self, '_reference_distribution'):
+            # Use current data as initial reference
+            self._reference_distribution = current_features.copy()
+            logger.info("Initialized reference distribution for drift detection")
+            return 0.0
+        
+        reference = self._reference_distribution
+        current = current_features
+        
+        # Ensure same length for comparison (use minimum)
+        min_len = min(len(reference), len(current))
+        if min_len < n_bins * 2:
+            # Not enough data for meaningful PSI calculation
+            return 0.0
+        
+        # Create bins based on reference distribution
+        bin_edges = np.histogram_bin_edges(reference, bins=n_bins)
+        
+        # Calculate percentages in each bin
+        ref_counts, _ = np.histogram(reference, bins=bin_edges)
+        curr_counts, _ = np.histogram(current, bins=bin_edges)
+        
+        # Convert to percentages
+        ref_pct = (ref_counts + epsilon) / (len(reference) + epsilon * n_bins)
+        curr_pct = (curr_counts + epsilon) / (len(current) + epsilon * n_bins)
+        
+        # Calculate PSI
+        psi = np.sum((curr_pct - ref_pct) * np.log(curr_pct / ref_pct))
+        
+        # Update reference distribution with exponential moving average
+        # This allows gradual adaptation to legitimate distribution changes
+        alpha = 0.1  # Smoothing factor
+        self._reference_distribution = alpha * current + (1 - alpha) * reference
+        
+        return float(psi)
     
     def _check_threat_similarity(self, request: Dict[str, Any]) -> FirewallResult:
         """Check similarity to known attack patterns"""
