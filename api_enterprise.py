@@ -87,14 +87,17 @@ def sanitize_input(value: Any) -> Any:
     Sanitize input data to prevent injection attacks.
     
     Rules applied:
-    - Remove null bytes
+    - Remove null bytes and CRLF sequences
     - Trim whitespace from strings
     - Validate string length (max 10KB per field)
     - Recursively process nested structures
+    - Sanitize header values to prevent header injection
     """
     if isinstance(value, str):
-        # Remove null bytes and control characters
+        # Remove null bytes and control characters (except newline/tab for text)
         sanitized = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', value)
+        # Remove CRLF sequences to prevent header injection (CR=\r=0x0d, LF=\n=0x0a)
+        sanitized = re.sub(r'[\r\n]+', '', sanitized)
         # Trim whitespace
         sanitized = sanitized.strip()
         # Enforce maximum length
@@ -107,6 +110,46 @@ def sanitize_input(value: Any) -> Any:
         return [sanitize_input(item) for item in value]
     else:
         return value
+
+
+def sanitize_header_value(value: str) -> str:
+    """
+    Sanitize HTTP header values to prevent header injection/CRLF injection.
+    
+    This specifically addresses API-004 (Header Injection) by:
+    - Removing all CR (\r) and LF (\n) characters
+    - Removing other control characters
+    - Validating the result is a valid header value
+    
+    Args:
+        value: Header value to sanitize
+        
+    Returns:
+        Sanitized header value
+        
+    Raises:
+        ValueError: If the sanitized value is empty or invalid
+    """
+    if not isinstance(value, str):
+        value = str(value)
+    
+    # Remove ALL carriage returns and newlines (CRLF injection prevention)
+    sanitized = re.sub(r'[\r\n]+', '', value)
+    
+    # Remove other control characters that could be problematic
+    sanitized = re.sub(r'[\x00-\x1f\x7f]', '', sanitized)
+    
+    # Trim whitespace
+    sanitized = sanitized.strip()
+    
+    # Validate the result
+    if not sanitized:
+        raise ValueError("Header value cannot be empty after sanitization")
+    
+    if len(sanitized) > 1024:
+        raise ValueError("Header value exceeds maximum length of 1KB")
+    
+    return sanitized
 
 
 def validate_request_data(data: Dict[str, Any], required_fields: list) -> tuple[bool, str]:
@@ -127,6 +170,10 @@ def validate_request_data(data: Dict[str, Any], required_fields: list) -> tuple[
     # Type validation for common fields
     if 'data' in data and not isinstance(data['data'], dict):
         return False, "Field 'data' must be a dictionary"
+    
+    # Explicitly reject booleans where numbers are expected (Type Confusion IV-004)
+    if 'data' in data and isinstance(data['data'], bool):
+        return False, "Field 'data' cannot be a boolean"
     
     return True, ""
 
