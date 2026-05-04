@@ -142,15 +142,187 @@ class ModelFirewall:
     
     def _check_statistical_deviation(self, request: Dict[str, Any]) -> FirewallResult:
         """Check statistical properties against training distribution"""
-        # TODO: Implement proper statistical deviation check
-        # For now, return pass
-        return FirewallResult(
-            allowed=True,
-            action=FirewallAction.ALLOW,
-            reason="Statistical deviation check passed (placeholder)",
-            confidence=0.7,
-            details={"check": "statistical_deviation", "status": "placeholder"}
-        )
+        try:
+            data = request.get("data", {})
+            
+            if "input" not in data:
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason="Missing input data for statistical check",
+                    confidence=1.0,
+                    details={"check": "statistical_deviation", "issue": "missing_input"}
+                )
+            
+            input_data = data["input"]
+            
+            # Convert to numpy array for statistical analysis
+            if isinstance(input_data, list):
+                arr = np.array(input_data, dtype=np.float32)
+            elif isinstance(input_data, (int, float)):
+                arr = np.array([input_data], dtype=np.float32)
+            elif hasattr(input_data, "numpy"):
+                arr = input_data.numpy()
+            else:
+                arr = np.array(input_data, dtype=np.float32)
+            
+            # Flatten for scalar statistics
+            flat = arr.flatten()
+            
+            # Calculate key statistics
+            mean_val = float(np.mean(flat))
+            std_val = float(np.std(flat))
+            min_val = float(np.min(flat))
+            max_val = float(np.max(flat))
+            skewness = float(self._calculate_skewness(flat))
+            kurtosis = float(self._calculate_kurtosis(flat))
+            
+            # Define expected ranges based on training distribution
+            # These thresholds should be calibrated based on actual training data statistics
+            expected_mean_range = (-2.0, 2.0)  # Normalized data should have mean near 0
+            expected_std_range = (0.1, 3.0)    # Reasonable standard deviation
+            expected_value_range = (-5.0, 5.0) # Normalized value range
+            
+            # Check mean deviation
+            if mean_val < expected_mean_range[0] or mean_val > expected_mean_range[1]:
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason=f"Mean value {mean_val:.4f} outside expected range {expected_mean_range}",
+                    confidence=0.85,
+                    details={
+                        "check": "statistical_deviation",
+                        "issue": "mean_deviation",
+                        "mean": mean_val,
+                        "expected_range": expected_mean_range
+                    }
+                )
+            
+            # Check std deviation
+            if std_val < expected_std_range[0] or std_val > expected_std_range[1]:
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason=f"Standard deviation {std_val:.4f} outside expected range {expected_std_range}",
+                    confidence=0.85,
+                    details={
+                        "check": "statistical_deviation",
+                        "issue": "std_deviation",
+                        "std": std_val,
+                        "expected_range": expected_std_range
+                    }
+                )
+            
+            # Check for extreme values
+            if min_val < expected_value_range[0] or max_val > expected_value_range[1]:
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason=f"Values out of expected range: [{min_val:.4f}, {max_val:.4f}] vs {expected_value_range}",
+                    confidence=0.8,
+                    details={
+                        "check": "statistical_deviation",
+                        "issue": "value_range",
+                        "min": min_val,
+                        "max": max_val,
+                        "expected_range": expected_value_range
+                    }
+                )
+            
+            # Check for adversarial patterns: very low variance with extreme mean shift
+            # This can indicate gradient-based attacks
+            if std_val < 0.01 and abs(mean_val) > 1.5:
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason=f"Suspicious pattern: low variance ({std_val:.6f}) with shifted mean ({mean_val:.4f})",
+                    confidence=0.9,
+                    details={
+                        "check": "statistical_deviation",
+                        "issue": "adversarial_pattern",
+                        "mean": mean_val,
+                        "std": std_val
+                    }
+                )
+            
+            # Check skewness (extreme asymmetry can indicate manipulation)
+            if abs(skewness) > 3.0:
+                return FirewallResult(
+                    allowed=True,
+                    action=FirewallAction.ESCALATE,
+                    reason=f"High skewness detected: {skewness:.4f}",
+                    confidence=0.7,
+                    details={
+                        "check": "statistical_deviation",
+                        "issue": "high_skewness",
+                        "skewness": skewness
+                    }
+                )
+            
+            # Check kurtosis (heavy tails can indicate outliers/attacks)
+            if abs(kurtosis) > 10.0:
+                return FirewallResult(
+                    allowed=True,
+                    action=FirewallAction.ESCALATE,
+                    reason=f"High kurtosis detected: {kurtosis:.4f}",
+                    confidence=0.7,
+                    details={
+                        "check": "statistical_deviation",
+                        "issue": "high_kurtosis",
+                        "kurtosis": kurtosis
+                    }
+                )
+            
+            return FirewallResult(
+                allowed=True,
+                action=FirewallAction.ALLOW,
+                reason="Statistical deviation check passed",
+                confidence=0.9,
+                details={
+                    "check": "statistical_deviation",
+                    "mean": mean_val,
+                    "std": std_val,
+                    "min": min_val,
+                    "max": max_val,
+                    "skewness": skewness,
+                    "kurtosis": kurtosis
+                }
+            )
+            
+        except Exception as e:
+            return FirewallResult(
+                allowed=False,
+                action=FirewallAction.BLOCK,
+                reason=f"Statistical deviation check failed: {str(e)}",
+                confidence=1.0,
+                details={"check": "statistical_deviation", "error": str(e)}
+            )
+    
+    def _calculate_skewness(self, data: np.ndarray) -> float:
+        """Calculate sample skewness"""
+        n = len(data)
+        if n < 3:
+            return 0.0
+        mean = np.mean(data)
+        std = np.std(data, ddof=1)
+        if std == 0:
+            return 0.0
+        return (n / ((n - 1) * (n - 2))) * np.sum(((data - mean) / std) ** 3)
+    
+    def _calculate_kurtosis(self, data: np.ndarray) -> float:
+        """Calculate excess kurtosis"""
+        n = len(data)
+        if n < 4:
+            return 0.0
+        mean = np.mean(data)
+        std = np.std(data, ddof=1)
+        if std == 0:
+            return 0.0
+        m4 = np.mean((data - mean) ** 4)
+        m2 = np.mean((data - mean) ** 2)
+        if m2 == 0:
+            return 0.0
+        return (m4 / (m2 ** 2)) - 3
     
     def _check_confidence_collapse(self, request: Dict[str, Any]) -> FirewallResult:
         """Detect sudden confidence drops (adversarial indicator)"""
