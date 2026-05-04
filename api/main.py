@@ -128,12 +128,14 @@ async def lifespan(app: FastAPI):
     attack_intel = None
     audit_logger = None
 
-# Create FastAPI app
+# Create FastAPI app with HTTPS enforcement middleware support
 app = FastAPI(
     title="Enterprise Adversarial ML Security Platform",
     description="Unified security control plane for machine learning models",
     version="4.0.0-enterprise",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url="/docs" if os.environ.get("FORCE_HTTPS", "false").lower() != "true" else None,
+    redoc_url="/redoc" if os.environ.get("FORCE_HTTPS", "false").lower() != "true" else None,
 )
 
 # CORS - Secure configuration with explicit allowed origins
@@ -148,10 +150,68 @@ app.add_middleware(
     allow_origins=CORS_ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-Forwarded-Proto"],
     expose_headers=["X-RateLimit-Limit", "X-RateLimit-Window", "X-RateLimit-Remaining"],
     max_age=600,  # Cache preflight results for 10 minutes
 )
+
+
+@app.middleware("http")
+async def https_redirect_middleware(request: Request, call_next):
+    """
+    Middleware to enforce HTTPS in production environments.
+    Checks X-Forwarded-Proto header from reverse proxy/load balancer.
+    If FORCE_HTTPS=true and request is not HTTPS, returns 301 redirect.
+    """
+    force_https = os.environ.get("FORCE_HTTPS", "false").lower() == "true"
+    
+    if force_https:
+        forwarded_proto = request.headers.get("x-forwarded-proto", "http")
+        
+        if forwarded_proto != "https":
+            # Redirect HTTP to HTTPS
+            from starlette.responses import RedirectResponse
+            
+            # Build HTTPS URL
+            host = request.headers.get("host", request.url.hostname)
+            path = str(request.url.path)
+            query = str(request.url.query)
+            
+            https_url = f"https://{host}{path}"
+            if query:
+                https_url += f"?{query}"
+            
+            logger.info(f"🔒 Redirecting HTTP to HTTPS: {request.url} -> {https_url}")
+            return RedirectResponse(url=https_url, status_code=301)
+    
+    response = await call_next(request)
+    return response
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """
+    Add security headers to all responses for HTTPS enforcement and protection.
+    """
+    response = await call_next(request)
+    
+    # HSTS (HTTP Strict Transport Security) - enforce HTTPS for 1 year
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    
+    # Prevent MIME type sniffing
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    
+    # XSS Protection
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    
+    # Content Security Policy
+    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    
+    # Referrer Policy
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    
+    return response
 
 def get_client_identifier(request: Request) -> str:
     """Extract client identifier for rate limiting (IP or user ID)"""
@@ -630,16 +690,50 @@ async def generate_token(token_request: Dict[str, Any]):
 if __name__ == "__main__":
     import uvicorn
     from datetime import datetime
+    import os
     
     print("\n" + "="*80)
     print("🛡️ ENTERPRISE ADVERSARIAL ML SECURITY PLATFORM")
     print("Unified Architecture, Governance, and Intelligence System")
     print("="*80)
     
+    # HTTPS/TLS Configuration
+    # Set these environment variables in production:
+    #   SSL_CERT_FILE=/path/to/cert.pem
+    #   SSL_KEY_FILE=/path/to/key.pem
+    #   FORCE_HTTPS=true  (to enforce HTTPS redirect)
+    ssl_cert_file = os.environ.get("SSL_CERT_FILE")
+    ssl_key_file = os.environ.get("SSL_KEY_FILE")
+    force_https = os.environ.get("FORCE_HTTPS", "false").lower() == "true"
+    
+    # Configure SSL context if certificates are provided
+    ssl_config = None
+    if ssl_cert_file and ssl_key_file:
+        if not os.path.exists(ssl_cert_file):
+            raise FileNotFoundError(f"SSL certificate file not found: {ssl_cert_file}")
+        if not os.path.exists(ssl_key_file):
+            raise FileNotFoundError(f"SSL key file not found: {ssl_key_file}")
+        ssl_config = {
+            "certfile": ssl_cert_file,
+            "keyfile": ssl_key_file,
+        }
+        print(f"\n🔒 TLS/SSL enabled:")
+        print(f"   Certificate: {ssl_cert_file}")
+        print(f"   Key: {ssl_key_file}")
+    else:
+        print("\n⚠️  WARNING: Running without TLS/SSL (HTTP only)")
+        print("   For production, set SSL_CERT_FILE and SSL_KEY_FILE environment variables")
+        print("   Example: export SSL_CERT_FILE=/etc/ssl/certs/server.crt")
+        print("            export SSL_KEY_FILE=/etc/ssl/private/server.key")
+        print("            export FORCE_HTTPS=true")
+    
+    # Start server with or without SSL
     uvicorn.run(
         app,
         host="0.0.0.0",
-        port=8000,
-        log_level="info"
+        port=8443 if ssl_config else int(os.environ.get("PORT", 8000)),
+        log_level="info",
+        ssl_keyfile=ssl_config["keyfile"] if ssl_config else None,
+        ssl_certfile=ssl_config["certfile"] if ssl_config else None,
     )
 

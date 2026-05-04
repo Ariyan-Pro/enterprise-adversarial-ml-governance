@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 🚀 MINIMAL WORKING API ENTERPRISE - UTF-8 SAFE
 Enterprise Adversarial ML Governance Engine API
@@ -115,16 +115,43 @@ if __name__ == "__main__":
         print(f"   Database mode: {phase5_engine.database_mode}")
         print(f"   System state: {phase5_engine.system_state}")
     
+    # HTTPS/TLS Configuration
+    import os
+    ssl_cert_file = os.environ.get("SSL_CERT_FILE")
+    ssl_key_file = os.environ.get("SSL_KEY_FILE")
+    
+    ssl_config = None
+    if ssl_cert_file and ssl_key_file:
+        if not os.path.exists(ssl_cert_file):
+            raise FileNotFoundError(f"SSL certificate file not found: {ssl_cert_file}")
+        if not os.path.exists(ssl_key_file):
+            raise FileNotFoundError(f"SSL key file not found: {ssl_key_file}")
+        ssl_config = {
+            "certfile": ssl_cert_file,
+            "keyfile": ssl_key_file,
+        }
+        print(f"\n🔒 TLS/SSL enabled:")
+        print(f"   Certificate: {ssl_cert_file}")
+        print(f"   Key: {ssl_key_file}")
+    else:
+        print("\n⚠️  WARNING: Running without TLS/SSL (HTTP only)")
+        print("   For production, set SSL_CERT_FILE and SSL_KEY_FILE environment variables")
+    
     print("\n🌐 Starting API server...")
-    print("   Docs: http://localhost:8000/docs")
-    print("   Health: http://localhost:8000/api/health")
+    if ssl_config:
+        print(f"   Secure URL: https://localhost:8443/docs")
+    else:
+        print(f"   Docs: http://localhost:8000/docs")
+    print(f"   Health: {'https' if ssl_config else 'http'}://localhost:{8443 if ssl_config else 8000}/api/health")
     print("   Stop: Ctrl+C")
     print("\n" + "="*60)
     
     uvicorn.run(
         app,
         host="0.0.0.0",
-        port=8000,
-        log_level="info"
+        port=8443 if ssl_config else 8000,
+        log_level="info",
+        ssl_keyfile=ssl_config["keyfile"] if ssl_config else None,
+        ssl_certfile=ssl_config["certfile"] if ssl_config else None,
     )
 

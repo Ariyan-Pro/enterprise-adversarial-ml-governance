@@ -7,19 +7,25 @@ services:
       dockerfile: deployment/Dockerfile
     container_name: adversarial-ml-security-api
     ports:
-      - "8000:8000"
+      - "${HTTPS_PORT:-8443}:8443"
     environment:
-      - ENVIRONMENT=development
+      - ENVIRONMENT=production
       - SECURITY_LEVEL=enterprise
       - LOG_LEVEL=INFO
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-}  # Must be set in production with a strong random value (min 32 bytes hex)
+      - SSL_CERT_FILE=/etc/ssl/certs/server.crt
+      - SSL_KEY_FILE=/etc/ssl/private/server.key
+      - FORCE_HTTPS=${FORCE_HTTPS:-true}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-https://localhost:3000,https://localhost:8080}
     volumes:
       - ../reports:/app/reports
       - ../logs:/app/logs
       - ../data:/app/data
+      - ${SSL_CERT_PATH:-./ssl/certs}:/etc/ssl/certs:ro
+      - ${SSL_KEY_PATH:-./ssl/private}:/etc/ssl/private:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/health', timeout=2)"]
+      test: ["CMD", "python", "-c", "import ssl; import requests; requests.get('https://localhost:8443/api/health', timeout=2, verify='/etc/ssl/certs/server.crt')"]
       interval: 30s
       timeout: 10s
       retries: 3
