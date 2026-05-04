@@ -1,3 +1,5 @@
-Nothing should be ignored in this case, as the changes only include source/config files (.py, .yml) without any build artifacts, dependencies, or temporary files.
-
-Output: (empty)
+```
+# Security audit reports
+reports/SECURITY_AUDIT_DETAILED_REPORT.md
+reports/security_audit_report.json
+```
