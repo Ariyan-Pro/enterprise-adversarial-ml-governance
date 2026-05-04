@@ -56,9 +56,12 @@ def create_database():
             if not result:
                 print(f"Creating database: {config.database}")
                 conn.execute(text("COMMIT"))  # Exit transaction
-                # Use identifier-safe quoting for database name to prevent SQL injection
-                db_name = config.database.replace('"', '""')
-                conn.execute(text(f'CREATE DATABASE "{db_name}"'))
+                # Use psycopg2's identifier quoting for database name to prevent SQL injection
+                from psycopg2.extensions import quote_ident
+                db_name = quote_ident(config.database, conn)
+                # Safe to use f-string here since db_name is properly quoted by quote_ident
+                create_db_sql = f"CREATE DATABASE {db_name}"
+                conn.execute(text(create_db_sql))
                 print("✅ Database created")
             else:
                 print(f"✅ Database already exists: {config.database}")

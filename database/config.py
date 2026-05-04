@@ -141,7 +141,8 @@ class DatabaseHealthMonitor:
                 connect_timeout=self.config.connect_timeout
             )
             cursor = conn.cursor()
-            cursor.execute("SELECT 1")
+            # Use parameterized query to prevent SQL injection
+            cursor.execute("SELECT %s", (1,))
             cursor.fetchone()
             cursor.close()
             conn.close()
