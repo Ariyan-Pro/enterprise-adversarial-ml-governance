@@ -39,8 +39,34 @@ logger = logging.getLogger("enterprise_api")
 # Security
 security = HTTPBearer()
 
-# JWT Configuration - Use environment variable or generate secure default
-JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", os.urandom(32).hex())
+# JWT Configuration - Require environment variable for production security
+# The JWT secret MUST be set via environment variable in production
+# Never use runtime-generated secrets as they cause token invalidation on restart
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
+if not JWT_SECRET_KEY:
+    # In development only: generate and warn (never use in production)
+    import warnings
+    JWT_SECRET_KEY = os.urandom(32).hex()
+    warnings.warn(
+        "⚠️ SECURITY WARNING: JWT_SECRET_KEY not set in environment. "
+        "Using runtime-generated secret. This will invalidate all tokens on restart. "
+        "SET JWT_SECRET_KEY environment variable in production!",
+        RuntimeWarning,
+        stacklevel=2
+    )
+    logger.warning(
+        "⚠️ INSECURE: JWT_SECRET_KEY not configured. Using runtime-generated secret. "
+        "Set JWT_SECRET_KEY environment variable for production deployments."
+    )
+
+# Validate JWT secret key strength (must be at least 32 bytes/64 hex chars)
+if len(JWT_SECRET_KEY) < 64:
+    raise ValueError(
+        f"JWT_SECRET_KEY is too weak. Minimum 64 characters (32 bytes) required. "
+        f"Current length: {len(JWT_SECRET_KEY)}. "
+        "Generate a secure key with: python -c 'import secrets; print(secrets.token_hex(32))'"
+    )
+
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
