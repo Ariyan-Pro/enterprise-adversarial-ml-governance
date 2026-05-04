@@ -474,11 +474,58 @@ async def list_models(user: Dict[str, Any] = Depends(authenticate)):
     }
 
 # ==================== TOKEN MANAGEMENT ====================
+
+def validate_credentials(username: str, password: str) -> bool:
+    """
+    Validate user credentials against secure identity provider.
+    
+    In production, replace this with actual credential validation:
+    - LDAP/Active Directory lookup
+    - OAuth2/OIDC provider validation
+    - Database lookup with hashed passwords (bcrypt, argon2)
+    - Multi-factor authentication verification
+    
+    Args:
+        username: User's username/email
+        password: User's password
+        
+    Returns:
+        bool: True if credentials are valid, False otherwise
+    """
+    # TODO: Replace with actual credential validation against your IDP
+    # Example implementations:
+    # 
+    # 1. LDAP/AD Validation:
+    #    from ldap3 import Server, Connection, ALL
+    #    server = Server('ldap://your-ad-server', get_info=ALL)
+    #    conn = Connection(server, user=username, password=password)
+    #    return conn.bind()
+    #
+    # 2. Database Validation (with bcrypt):
+    #    import bcrypt
+    #    hashed = db.get_password_hash(username)
+    #    return bcrypt.checkpw(password.encode(), hashed)
+    #
+    # 3. OAuth2/OIDC Validation:
+    #    from authlib.integrations.requests_client import OAuth2Session
+    #    client = OAuth2Session(client_id, client_secret)
+    #    token = client.fetch_token(token_endpoint, username=username, password=password)
+    #    return 'access_token' in token
+    
+    # SECURITY WARNING: This is a placeholder - NEVER use in production!
+    # Proper credential validation MUST be implemented before deployment.
+    raise NotImplementedError(
+        "Credential validation not implemented. "
+        "Please configure your identity provider (LDAP, OAuth2, database) "
+        "before using this endpoint in production."
+    )
+
+
 @app.post("/api/v1/auth/token")
 async def generate_token(token_request: Dict[str, Any]):
     """
     Generate a JWT token for authenticated users.
-    In production, this should validate credentials against a secure identity provider.
+    Validates credentials against configured identity provider.
     
     Expected request body:
     {
@@ -488,19 +535,46 @@ async def generate_token(token_request: Dict[str, Any]):
         "permissions": ["predict", "view_reports"]  # optional
     }
     """
-    # TODO: In production, validate credentials against your identity provider
-    # For now, we accept any non-empty username/password combination
     username = token_request.get("username")
     password = token_request.get("password")
     
+    # Validate required fields
     if not username or not password:
         raise HTTPException(
             status_code=400,
             detail="Username and password are required"
         )
     
-    # TODO: Implement proper credential validation against your IDP
-    # Example: validate_credentials(username, password)
+    # Validate credentials length to prevent DoS attacks
+    if len(username) > 256 or len(password) > 256:
+        raise HTTPException(
+            status_code=400,
+            detail="Username or password too long"
+        )
+    
+    # CRITICAL: Validate credentials against identity provider
+    try:
+        credentials_valid = validate_credentials(username, password)
+    except NotImplementedError as e:
+        logger.error(f"🚨 CREDENTIAL VALIDATION NOT CONFIGURED: {e}")
+        raise HTTPException(
+            status_code=501,
+            detail="Service unavailable: Identity provider not configured"
+        )
+    except Exception as e:
+        logger.error(f"🚨 Credential validation error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Unable to validate credentials"
+        )
+    
+    if not credentials_valid:
+        # Use generic message to prevent username enumeration
+        logger.warning(f"Failed login attempt for user: {username}")
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials"
+        )
     
     # Set default permissions based on roles if not provided
     roles = token_request.get("roles", ["ml_engineer"])
