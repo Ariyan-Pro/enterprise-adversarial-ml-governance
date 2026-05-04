@@ -359,19 +359,244 @@ class ModelFirewall:
     
     def _check_threat_similarity(self, request: Dict[str, Any]) -> FirewallResult:
         """Check similarity to known attack patterns"""
-        # TODO: Implement threat signature matching
-        return FirewallResult(
-            allowed=True,
-            action=FirewallAction.ALLOW,
-            reason="Threat similarity check passed",
-            confidence=0.75,
-            details={"check": "threat_similarity", "threat_signatures": len(self.threat_signatures)}
-        )
+        try:
+            data = request.get("data", {})
+            
+            if "input" not in data:
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason="Missing input data for threat check",
+                    confidence=1.0,
+                    details={"check": "threat_similarity", "issue": "missing_input"}
+                )
+            
+            input_data = data["input"]
+            
+            # Convert to numpy array for analysis
+            if isinstance(input_data, list):
+                arr = np.array(input_data, dtype=np.float32)
+            elif isinstance(input_data, (int, float)):
+                arr = np.array([input_data], dtype=np.float32)
+            elif hasattr(input_data, "numpy"):
+                arr = input_data.numpy()
+            else:
+                arr = np.array(input_data, dtype=np.float32)
+            
+            flat = arr.flatten()
+            
+            # Calculate features for threat matching
+            mean_val = float(np.mean(flat))
+            std_val = float(np.std(flat))
+            min_val = float(np.min(flat))
+            max_val = float(np.max(flat))
+            
+            # Check against known threat signatures
+            matched_threats = []
+            for signature in self.threat_signatures:
+                if self._match_signature(flat, signature):
+                    matched_threats.append(signature)
+            
+            # If any threats matched, block or escalate
+            if matched_threats:
+                threat_names = [t["name"] for t in matched_threats]
+                max_severity = max([t.get("severity", 1) for t in matched_threats])
+                
+                if max_severity >= 3:  # High severity threats
+                    return FirewallResult(
+                        allowed=False,
+                        action=FirewallAction.BLOCK,
+                        reason=f"Matched known attack patterns: {', '.join(threat_names)}",
+                        confidence=0.95,
+                        details={
+                            "check": "threat_similarity",
+                            "matched_threats": threat_names,
+                            "severity": max_severity
+                        }
+                    )
+                else:
+                    return FirewallResult(
+                        allowed=True,
+                        action=FirewallAction.ESCALATE,
+                        reason=f"Potential threat patterns detected: {', '.join(threat_names)}",
+                        confidence=0.8,
+                        details={
+                            "check": "threat_similarity",
+                            "matched_threats": threat_names,
+                            "severity": max_severity
+                        }
+                    )
+            
+            # Check for common adversarial attack patterns
+            adversarial_indicators = self._detect_adversarial_patterns(flat, mean_val, std_val)
+            if adversarial_indicators:
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason=f"Adversarial attack indicators: {', '.join(adversarial_indicators)}",
+                    confidence=0.9,
+                    details={
+                        "check": "threat_similarity",
+                        "indicators": adversarial_indicators
+                    }
+                )
+            
+            return FirewallResult(
+                allowed=True,
+                action=FirewallAction.ALLOW,
+                reason="Threat similarity check passed",
+                confidence=0.85,
+                details={
+                    "check": "threat_similarity",
+                    "threat_signatures_checked": len(self.threat_signatures),
+                    "matched": 0
+                }
+            )
+            
+        except Exception as e:
+            return FirewallResult(
+                allowed=False,
+                action=FirewallAction.BLOCK,
+                reason=f"Threat similarity check failed: {str(e)}",
+                confidence=1.0,
+                details={"check": "threat_similarity", "error": str(e)}
+            )
+    
+    def _match_signature(self, data: np.ndarray, signature: Dict[str, Any]) -> bool:
+        """Check if data matches a threat signature"""
+        sig_type = signature.get("type")
+        
+        if sig_type == "statistical":
+            # Match based on statistical properties
+            thresholds = signature.get("thresholds", {})
+            
+            mean_match = True
+            if "mean_min" in thresholds and data.mean() < thresholds["mean_min"]:
+                mean_match = False
+            if "mean_max" in thresholds and data.mean() > thresholds["mean_max"]:
+                mean_match = False
+            
+            std_match = True
+            if "std_min" in thresholds and data.std() < thresholds["std_min"]:
+                std_match = False
+            if "std_max" in thresholds and data.std() > thresholds["std_max"]:
+                std_match = False
+            
+            return mean_match and std_match
+        
+        elif sig_type == "pattern":
+            # Match based on specific value patterns
+            pattern = signature.get("pattern", {})
+            
+            if "all_same" in pattern and pattern["all_same"]:
+                if data.std() < 1e-6:
+                    return True
+            
+            if "extreme_range" in pattern and pattern["extreme_range"]:
+                if data.max() - data.min() > pattern.get("min_range", 8.0):
+                    return True
+            
+            if "specific_values" in pattern:
+                target_vals = pattern["specific_values"]
+                matches = sum(1 for v in target_vals if np.any(np.isclose(data, v, rtol=1e-3)))
+                if matches >= pattern.get("min_matches", len(target_vals)):
+                    return True
+        
+        return False
+    
+    def _detect_adversarial_patterns(self, data: np.ndarray, mean: float, std: float) -> List[str]:
+        """Detect common adversarial attack patterns"""
+        indicators = []
+        
+        # FGSM-like attack: small uniform perturbation
+        if std < 0.05 and abs(mean) > 0.5:
+            indicators.append("fgsm_like_attack")
+        
+        # PGD-like attack: clipped perturbations
+        unique_vals = len(np.unique(data.round(decimals=4)))
+        total_vals = len(data)
+        if unique_vals < total_vals * 0.1 and total_vals > 10:
+            indicators.append("pgd_like_attack")
+        
+        # Boundary attack: values at extreme ranges
+        extreme_ratio = np.sum((data > 4.0) | (data < -4.0)) / len(data)
+        if extreme_ratio > 0.5:
+            indicators.append("boundary_attack")
+        
+        # Noise injection: unusually high variance
+        if std > 5.0:
+            indicators.append("noise_injection")
+        
+        return indicators
     
     def _load_threat_signatures(self) -> List[Dict[str, Any]]:
         """Load known threat signatures"""
-        # TODO: Load from database/file
-        return []
+        # Built-in threat signature database
+        signatures = [
+            {
+                "name": "Zero Input Attack",
+                "type": "statistical",
+                "severity": 2,
+                "description": "All-zero or near-zero input attempting to bypass model",
+                "thresholds": {
+                    "mean_min": -0.01,
+                    "mean_max": 0.01,
+                    "std_max": 0.001
+                }
+            },
+            {
+                "name": "Uniform Perturbation",
+                "type": "statistical",
+                "severity": 3,
+                "description": "FGSM-style uniform perturbation attack",
+                "thresholds": {
+                    "std_min": 0.01,
+                    "std_max": 0.1,
+                    "mean_min": -0.5,
+                    "mean_max": 0.5
+                }
+            },
+            {
+                "name": "Extreme Value Injection",
+                "type": "statistical",
+                "severity": 3,
+                "description": "Attempt to inject extreme values to cause overflow/underflow",
+                "thresholds": {
+                    "std_min": 3.0
+                }
+            },
+            {
+                "name": "Constant Pattern Attack",
+                "type": "pattern",
+                "severity": 2,
+                "description": "All values identical - possible model probing",
+                "pattern": {
+                    "all_same": True
+                }
+            },
+            {
+                "name": "Wide Range Sweep",
+                "type": "pattern",
+                "severity": 2,
+                "description": "Attempting to sweep across entire input range",
+                "pattern": {
+                    "extreme_range": True,
+                    "min_range": 9.0
+                }
+            },
+            {
+                "name": "Targeted Value Pattern",
+                "type": "pattern",
+                "severity": 3,
+                "description": "Specific known malicious value pattern",
+                "pattern": {
+                    "specific_values": [0.5, -0.5, 1.0, -1.0],
+                    "min_matches": 3
+                }
+            }
+        ]
+        
+        return signatures
     
     def _log_evaluation(self, request: Dict[str, Any], results: List[FirewallResult]):
         """Log firewall evaluation for audit"""
