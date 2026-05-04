@@ -7,8 +7,13 @@ import torch
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 import json
 from datetime import datetime
+import logging
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 class FirewallAction(Enum):
     ALLOW = "allow"
@@ -347,15 +352,198 @@ class ModelFirewall:
         )
     
     def _check_drift_indicators(self, request: Dict[str, Any]) -> FirewallResult:
-        """Check for data/model drift indicators"""
-        # TODO: Implement drift detection
-        return FirewallResult(
-            allowed=True,
-            action=FirewallAction.ALLOW,
-            reason="Drift check passed (placeholder)",
-            confidence=0.7,
-            details={"check": "drift_indicators", "status": "placeholder"}
-        )
+        """Check for data/model drift indicators using Population Stability Index (PSI)"""
+        try:
+            data = request.get("data", {})
+            
+            # Get input features from request
+            if "input" not in data and "features" not in data:
+                return FirewallResult(
+                    allowed=True,
+                    action=FirewallAction.ALLOW,
+                    reason="Drift check passed (no input data)",
+                    confidence=0.7,
+                    details={"check": "drift_indicators", "status": "no_input"}
+                )
+            
+            # Extract feature values
+            input_data = data.get("input", data.get("features", []))
+            
+            # Convert to numpy array if needed
+            if isinstance(input_data, list):
+                import numpy as np
+                input_data = np.array(input_data)
+            
+            # Calculate PSI against reference distribution
+            psi_score = self._calculate_psi(input_data)
+            
+            # Drift thresholds
+            PSI_LOW_DRIFT = 0.1
+            PSI_MEDIUM_DRIFT = 0.2
+            PSI_HIGH_DRIFT = 0.25
+            
+            if psi_score >= PSI_HIGH_DRIFT:
+                logger.warning(f"🚨 HIGH DRIFT DETECTED: PSI={psi_score:.4f}")
+                return FirewallResult(
+                    allowed=False,
+                    action=FirewallAction.BLOCK,
+                    reason=f"High data drift detected (PSI={psi_score:.4f})",
+                    confidence=0.95,
+                    details={
+                        "check": "drift_indicators",
+                        "psi_score": psi_score,
+                        "severity": "high"
+                    }
+                )
+            elif psi_score >= PSI_MEDIUM_DRIFT:
+                logger.warning(f"⚠️ MEDIUM DRIFT DETECTED: PSI={psi_score:.4f}")
+                return FirewallResult(
+                    allowed=True,
+                    action=FirewallAction.LOG,
+                    reason=f"Medium data drift detected (PSI={psi_score:.4f})",
+                    confidence=0.8,
+                    details={
+                        "check": "drift_indicators",
+                        "psi_score": psi_score,
+                        "severity": "medium"
+                    }
+                )
+            elif psi_score >= PSI_LOW_DRIFT:
+                logger.info(f"📊 LOW DRIFT DETECTED: PSI={psi_score:.4f}")
+                return FirewallResult(
+                    allowed=True,
+                    action=FirewallAction.LOG,
+                    reason=f"Low data drift detected (PSI={psi_score:.4f})",
+                    confidence=0.7,
+                    details={
+                        "check": "drift_indicators",
+                        "psi_score": psi_score,
+                        "severity": "low"
+                    }
+                )
+            else:
+                return FirewallResult(
+                    allowed=True,
+                    action=FirewallAction.ALLOW,
+                    reason=f"No significant drift (PSI={psi_score:.4f})",
+                    confidence=0.9,
+                    details={
+                        "check": "drift_indicators",
+                        "psi_score": psi_score,
+                        "severity": "none"
+                    }
+                )
+                
+        except Exception as e:
+            logger.error(f"Drift detection error: {e}")
+            # Fail open - allow request but log error
+            return FirewallResult(
+                allowed=True,
+                action=FirewallAction.LOG,
+                reason=f"Drift check failed with error: {e}",
+                confidence=0.5,
+                details={"check": "drift_indicators", "status": "error", "error": str(e)}
+            )
+    
+    def _calculate_psi(self, current_data: np.ndarray, n_bins: int = 10) -> float:
+        """
+        Calculate Population Stability Index (PSI) between current and reference data.
+        
+        PSI measures how much a population has shifted over time.
+        Formula: PSI = Σ((Actual% - Expected%) * ln(Actual% / Expected%))
+        
+        Interpretation:
+        - PSI < 0.1: No significant change
+        - 0.1 <= PSI < 0.2: Moderate change
+        - PSI >= 0.2: Significant change
+        
+        Args:
+            current_data: Current batch of data
+            n_bins: Number of bins for discretization
+            
+        Returns:
+            float: PSI score
+        """
+        import numpy as np
+        
+        # Flatten data if multi-dimensional
+        if current_data.ndim > 1:
+            current_data = current_data.flatten()
+        
+        # Get reference data (stored during initialization or last known good distribution)
+        reference_data = self._get_reference_distribution()
+        
+        if reference_data is None or len(reference_data) == 0:
+            # No reference available, initialize with current data
+            self._set_reference_distribution(current_data)
+            return 0.0
+        
+        # Ensure we have enough data points
+        min_samples = max(100, n_bins * 10)
+        if len(current_data) < min_samples or len(reference_data) < min_samples:
+            logger.debug(f"Insufficient samples for PSI calculation")
+            return 0.0
+        
+        # Create bins based on reference data percentiles
+        try:
+            percentiles = np.linspace(0, 100, n_bins + 1)
+            bin_edges = np.percentile(reference_data, percentiles)
+            
+            # Remove duplicate edges (can happen with discrete data)
+            bin_edges = np.unique(bin_edges)
+            
+            if len(bin_edges) < 2:
+                return 0.0
+            
+            # Digitize data into bins
+            current_counts = np.histogram(current_data, bins=bin_edges)[0]
+            reference_counts = np.histogram(reference_data, bins=bin_edges)[0]
+            
+            # Convert to percentages (add small epsilon to avoid division by zero)
+            epsilon = 1e-6
+            current_pct = (current_counts + epsilon) / (len(current_data) + epsilon * n_bins)
+            reference_pct = (reference_counts + epsilon) / (len(reference_data) + epsilon * n_bins)
+            
+            # Calculate PSI
+            psi = np.sum((current_pct - reference_pct) * np.log(current_pct / reference_pct))
+            
+            return float(psi)
+            
+        except Exception as e:
+            logger.error(f"PSI calculation error: {e}")
+            return 0.0
+    
+    def _get_reference_distribution(self) -> Optional[np.ndarray]:
+        """Get reference distribution for drift detection"""
+        # Try to load from file
+        reference_path = Path("config/reference_distribution.npy")
+        if reference_path.exists():
+            try:
+                import numpy as np
+                return np.load(reference_path)
+            except Exception:
+                pass
+        return None
+    
+    def _set_reference_distribution(self, data: np.ndarray, max_samples: int = 10000):
+        """Save reference distribution for drift detection"""
+        try:
+            import numpy as np
+            
+            # Sample if too large
+            if len(data) > max_samples:
+                indices = np.random.choice(len(data), max_samples, replace=False)
+                data = data[indices]
+            
+            # Ensure config directory exists
+            reference_path = Path("config/reference_distribution.npy")
+            reference_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            np.save(reference_path, data)
+            logger.info(f"✅ Reference distribution saved ({len(data)} samples)")
+            
+        except Exception as e:
+            logger.error(f"Failed to save reference distribution: {e}")
     
     def _check_threat_similarity(self, request: Dict[str, Any]) -> FirewallResult:
         """Check similarity to known attack patterns"""

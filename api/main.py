@@ -45,6 +45,19 @@ security = HTTPBearer()
 # The JWT secret MUST be set via environment variable in production
 # Never use runtime-generated secrets as they cause token invalidation on restart
 JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
+
+# Check if running in production mode
+IS_PRODUCTION = os.environ.get("PRODUCTION", "false").lower() in ("true", "1", "yes")
+
+if IS_PRODUCTION and not JWT_SECRET_KEY:
+    # In production: FAIL startup if JWT_SECRET_KEY is not set
+    raise RuntimeError(
+        "🚨 CRITICAL SECURITY ERROR: JWT_SECRET_KEY is not configured! "
+        "In production mode, this is mandatory. "
+        "Generate a secure key with: python -c 'import secrets; print(secrets.token_hex(32))' "
+        "and set it as the JWT_SECRET_KEY environment variable."
+    )
+
 if not JWT_SECRET_KEY:
     # In development only: generate and warn (never use in production)
     import warnings
@@ -528,11 +541,17 @@ def validate_credentials(username: str, password: str) -> bool:
     """
     Validate user credentials against secure identity provider.
     
-    In production, replace this with actual credential validation:
+    Supports multiple authentication backends:
     - LDAP/Active Directory lookup
     - OAuth2/OIDC provider validation
     - Database lookup with hashed passwords (bcrypt, argon2)
     - Multi-factor authentication verification
+    
+    The authentication backend is selected via AUTH_BACKEND environment variable:
+    - "ldap": LDAP/Active Directory authentication
+    - "oauth2": OAuth2/OIDC authentication
+    - "database": Database authentication with bcrypt/argon2
+    - "development": Development mode with hardcoded credentials (NEVER use in production)
     
     Args:
         username: User's username/email
@@ -540,34 +559,267 @@ def validate_credentials(username: str, password: str) -> bool:
         
     Returns:
         bool: True if credentials are valid, False otherwise
+        
+    Raises:
+        RuntimeError: If authentication backend is not properly configured
     """
-    # TODO: Replace with actual credential validation against your IDP
-    # Example implementations:
-    # 
-    # 1. LDAP/AD Validation:
-    #    from ldap3 import Server, Connection, ALL
-    #    server = Server('ldap://your-ad-server', get_info=ALL)
-    #    conn = Connection(server, user=username, password=password)
-    #    return conn.bind()
-    #
-    # 2. Database Validation (with bcrypt):
-    #    import bcrypt
-    #    hashed = db.get_password_hash(username)
-    #    return bcrypt.checkpw(password.encode(), hashed)
-    #
-    # 3. OAuth2/OIDC Validation:
-    #    from authlib.integrations.requests_client import OAuth2Session
-    #    client = OAuth2Session(client_id, client_secret)
-    #    token = client.fetch_token(token_endpoint, username=username, password=password)
-    #    return 'access_token' in token
+    # Get authentication backend from environment
+    auth_backend = os.environ.get("AUTH_BACKEND", "development").lower()
     
-    # SECURITY WARNING: This is a placeholder - NEVER use in production!
-    # Proper credential validation MUST be implemented before deployment.
-    raise NotImplementedError(
-        "Credential validation not implemented. "
-        "Please configure your identity provider (LDAP, OAuth2, database) "
-        "before using this endpoint in production."
+    # Production safety check: reject development backend in production
+    if IS_PRODUCTION and auth_backend == "development":
+        logger.error("🚨 SECURITY ERROR: Development auth backend used in production!")
+        raise RuntimeError(
+            "Development authentication backend cannot be used in production. "
+            "Configure AUTH_BACKEND environment variable to 'ldap', 'oauth2', or 'database'."
+        )
+    
+    try:
+        if auth_backend == "ldap":
+            return _validate_ldap_credentials(username, password)
+        elif auth_backend == "oauth2":
+            return _validate_oauth2_credentials(username, password)
+        elif auth_backend == "database":
+            return _validate_database_credentials(username, password)
+        elif auth_backend == "development":
+            return _validate_development_credentials(username, password)
+        else:
+            logger.error(f"Unknown authentication backend: {auth_backend}")
+            raise ValueError(f"Unknown authentication backend: {auth_backend}")
+    except Exception as e:
+        logger.error(f"Credential validation failed for backend '{auth_backend}': {e}")
+        raise
+
+
+def _validate_ldap_credentials(username: str, password: str) -> bool:
+    """
+    Validate credentials against LDAP/Active Directory.
+    
+    Requires:
+    - LDAP_SERVER: LDAP server URL (e.g., ldap://ad.example.com)
+    - LDAP_BASE_DN: Base DN for user searches (e.g., dc=example,dc=com)
+    - LDAP_USER_FILTER: Optional filter for user lookup
+    """
+    try:
+        from ldap3 import Server, Connection, ALL, NTLM
+    except ImportError:
+        logger.error("ldap3 package not installed. Install with: pip install ldap3")
+        raise RuntimeError("LDAP authentication requires ldap3 package")
+    
+    ldap_server = os.environ.get("LDAP_SERVER")
+    ldap_base_dn = os.environ.get("LDAP_BASE_DN")
+    
+    if not ldap_server or not ldap_base_dn:
+        raise RuntimeError("LDAP_SERVER and LDAP_BASE_DN environment variables must be set")
+    
+    ldap_user_filter = os.environ.get("LDAP_USER_FILTER", "(sAMAccountName={username})")
+    ldap_use_ssl = os.environ.get("LDAP_USE_SSL", "false").lower() == "true"
+    ldap_auth_type = os.environ.get("LDAP_AUTH_TYPE", "SIMPLE").upper()
+    
+    try:
+        # Build LDAP server URL
+        scheme = "ldaps" if ldap_use_ssl else "ldap"
+        if not ldap_server.startswith("ldap"):
+            ldap_server = f"{scheme}://{ldap_server}"
+        
+        server = Server(ldap_server, get_info=ALL, use_ssl=ldap_use_ssl)
+        
+        # Format user filter
+        search_filter = ldap_user_filter.format(username=username)
+        
+        # First, search for the user's DN
+        conn = Connection(server, auto_bind=True)
+        conn.search(
+            search_base=ldap_base_dn,
+            search_filter=search_filter,
+            attributes=["distinguishedName"]
+        )
+        
+        if len(conn.entries) == 0:
+            logger.warning(f"LDAP user not found: {username}")
+            return False
+        
+        user_dn = conn.entries[0].distinguishedName.value
+        conn.unbind()
+        
+        # Now try to bind with the user's credentials
+        if ldap_auth_type == "NTLM":
+            ldap_domain = os.environ.get("LDAP_DOMAIN", "")
+            conn = Connection(
+                server,
+                user=f"{ldap_domain}\\{username}",
+                password=password,
+                authentication=NTLM,
+                auto_bind=False
+            )
+        else:
+            conn = Connection(server, user=user_dn, password=password, auto_bind=False)
+        
+        if not conn.bind():
+            logger.warning(f"LDAP bind failed for user: {username}")
+            return False
+        
+        conn.unbind()
+        logger.info(f"LDAP authentication successful for user: {username}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"LDAP authentication error: {e}")
+        raise
+
+
+def _validate_oauth2_credentials(username: str, password: str) -> bool:
+    """
+    Validate credentials using OAuth2/OIDC Resource Owner Password Credentials flow.
+    
+    Requires:
+    - OAUTH2_TOKEN_URL: OAuth2 token endpoint URL
+    - OAUTH2_CLIENT_ID: OAuth2 client ID
+    - OAUTH2_CLIENT_SECRET: OAuth2 client secret
+    - OAUTH2_SCOPE: Optional scope for the token request
+    """
+    try:
+        import requests
+    except ImportError:
+        logger.error("requests package not installed. Install with: pip install requests")
+        raise RuntimeError("OAuth2 authentication requires requests package")
+    
+    token_url = os.environ.get("OAUTH2_TOKEN_URL")
+    client_id = os.environ.get("OAUTH2_CLIENT_ID")
+    client_secret = os.environ.get("OAUTH2_CLIENT_SECRET")
+    
+    if not token_url or not client_id or not client_secret:
+        raise RuntimeError(
+            "OAUTH2_TOKEN_URL, OAUTH2_CLIENT_ID, and OAUTH2_CLIENT_SECRET "
+            "environment variables must be set"
+        )
+    
+    scope = os.environ.get("OAUTH2_SCOPE", "openid profile email")
+    
+    try:
+        response = requests.post(
+            token_url,
+            data={
+                "grant_type": "password",
+                "username": username,
+                "password": password,
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "scope": scope
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            logger.info(f"OAuth2 authentication successful for user: {username}")
+            return True
+        elif response.status_code == 401:
+            logger.warning(f"OAuth2 authentication failed for user: {username}")
+            return False
+        else:
+            logger.error(f"OAuth2 token endpoint returned status {response.status_code}: {response.text}")
+            raise RuntimeError(f"OAuth2 token endpoint error: {response.status_code}")
+            
+    except requests.exceptions.RequestException as e:
+        logger.error(f"OAuth2 connection error: {e}")
+        raise
+
+
+def _validate_database_credentials(username: str, password: str) -> bool:
+    """
+    Validate credentials against database with hashed passwords.
+    
+    Supports bcrypt and argon2 password hashing.
+    
+    Requires:
+    - DB_AUTH_CONNECTION_STRING: Database connection string
+    - DB_AUTH_QUERY: SQL query to retrieve user (with {username} placeholder)
+    - DB_PASSWORD_HASH_ALGORITHM: Hash algorithm ('bcrypt' or 'argon2')
+    """
+    db_connection_string = os.environ.get("DB_AUTH_CONNECTION_STRING")
+    db_query = os.environ.get("DB_AUTH_QUERY")
+    hash_algorithm = os.environ.get("DB_PASSWORD_HASH_ALGORITHM", "bcrypt").lower()
+    
+    if not db_connection_string or not db_query:
+        raise RuntimeError(
+            "DB_AUTH_CONNECTION_STRING and DB_AUTH_QUERY environment variables must be set"
+        )
+    
+    try:
+        import psycopg2  # PostgreSQL example; adapt for your database
+    except ImportError:
+        try:
+            import pymysql  # MySQL fallback
+        except ImportError:
+            logger.error("Database driver not installed. Install psycopg2 or pymysql")
+            raise RuntimeError("Database authentication requires a database driver")
+    
+    try:
+        # Connect to database
+        conn = psycopg2.connect(db_connection_string)
+        cursor = conn.cursor()
+        
+        # Execute query to get password hash
+        cursor.execute(db_query.format(username=username))
+        row = cursor.fetchone()
+        
+        if row is None:
+            logger.warning(f"User not found in database: {username}")
+            return False
+        
+        stored_hash = row[0]
+        
+        cursor.close()
+        conn.close()
+        
+        # Verify password based on hash algorithm
+        if hash_algorithm == "bcrypt":
+            try:
+                import bcrypt
+                return bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8'))
+            except ImportError:
+                logger.error("bcrypt package not installed. Install with: pip install bcrypt")
+                raise RuntimeError("bcrypt authentication requires bcrypt package")
+                
+        elif hash_algorithm == "argon2":
+            try:
+                from argon2 import PasswordHasher
+                ph = PasswordHasher()
+                ph.verify(stored_hash, password)
+                return True
+            except ImportError:
+                logger.error("argon2-cffi package not installed. Install with: pip install argon2-cffi")
+                raise RuntimeError("argon2 authentication requires argon2-cffi package")
+            except Exception:
+                return False
+        else:
+            raise ValueError(f"Unsupported password hash algorithm: {hash_algorithm}")
+            
+    except Exception as e:
+        logger.error(f"Database authentication error: {e}")
+        raise
+
+
+def _validate_development_credentials(username: str, password: str) -> bool:
+    """
+    Development-only credential validation.
+    
+    WARNING: NEVER use this in production!
+    This is only for local development and testing.
+    
+    Uses hardcoded credentials from environment variables:
+    - DEV_AUTH_USERNAME: Development username
+    - DEV_AUTH_PASSWORD: Development password
+    """
+    dev_username = os.environ.get("DEV_AUTH_USERNAME", "admin")
+    dev_password = os.environ.get("DEV_AUTH_PASSWORD", "admin123")
+    
+    logger.warning(
+        f"⚠️ Using development authentication for user: {username}. "
+        "NEVER use in production!"
     )
+    
+    return username == dev_username and password == dev_password
 
 
 @app.post("/api/v1/auth/token")

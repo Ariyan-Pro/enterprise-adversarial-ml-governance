@@ -1,3 +1,15 @@
-Nothing should be ignored in this case, as the changes only include source/config files (.py, .yml) without any build artifacts, dependencies, or temporary files.
+```
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-Output: (empty)
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+*.env.*
+```
