@@ -455,10 +455,13 @@ class EcosystemAuthorityEngine(DatabaseAwareEngine):
                     results["fail_count"] += 1
                     
             except Exception as e:
+                # Log full error internally but return generic message to avoid leaking sensitive info
+                import logging
+                logging.error(f"Failed to propagate intelligence to domain {target_domain.value}: {e}")
                 results["target_domains"].append({
                     "domain": target_domain.value,
                     "status": "error",
-                    "reason": str(e)
+                    "reason": "Internal error occurred"
                 })
                 results["fail_count"] += 1
         

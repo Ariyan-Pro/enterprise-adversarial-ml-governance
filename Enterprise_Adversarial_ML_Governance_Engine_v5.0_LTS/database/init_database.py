@@ -91,9 +91,9 @@ def create_tables():
         return True
         
     except Exception as e:
-        print(f"❌ Failed to create tables: {e}")
-        import traceback
-        traceback.print_exc()
+        # Log full error internally but avoid printing detailed traceback to stdout
+        import logging
+        logging.error(f"Failed to create tables: {e}", exc_info=True)
         return False
 
 def create_initial_deployment():

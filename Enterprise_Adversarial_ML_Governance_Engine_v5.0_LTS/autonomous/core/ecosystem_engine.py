@@ -556,8 +556,10 @@ class EcosystemAuthorityEngine(DatabaseAwareEngine):
             }
             
         except Exception as e:
-            print(f"❌ Failed to generate ecosystem health report: {e}")
-            return {"error": str(e)}
+            # Log full error internally but return generic message to avoid leaking sensitive info
+            import logging
+            logging.error(f"Failed to generate ecosystem health report: {e}")
+            return {"error": "Internal error occurred"}
     
     def _calculate_domain_health(self, intelligence: DomainIntelligence) -> float:
         """Calculate health score for a domain"""
