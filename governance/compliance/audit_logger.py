@@ -10,6 +10,8 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
 from enum import Enum
 import hashlib
+import hmac
+import os
 
 class RiskLevel(Enum):
     LOW = "low"
@@ -625,7 +627,7 @@ class EnterpriseGovernance:
             json.dump(self.incidents, f, indent=2, default=str)
 
 class EnterpriseAuditLogger:
-    """Enterprise audit logging system"""
+    """Enterprise audit logging system with integrity protection"""
     
     def __init__(self, audit_dir: str = "governance/audit_logs"):
         self.audit_dir = Path(audit_dir)
@@ -633,6 +635,160 @@ class EnterpriseAuditLogger:
         
         # In-memory audit trail (last 1000 requests)
         self.audit_trail: Dict[str, Dict] = {}
+        
+        # Initialize integrity protection
+        self._integrity_key = self._get_or_create_integrity_key()
+        self._integrity_chain: Dict[str, str] = {}  # request_id -> hash
+        self._load_integrity_chain()
+    
+    def _get_or_create_integrity_key(self) -> bytes:
+        """Get or create HMAC key for audit log integrity protection."""
+        key_file = self.audit_dir / ".audit_integrity_key"
+        
+        if key_file.exists():
+            with open(key_file, "rb") as f:
+                return f.read()
+        else:
+            # Generate a new secure random key
+            key = os.urandom(32)
+            with open(key_file, "wb") as f:
+                f.write(key)
+            # Restrict file permissions
+            os.chmod(key_file, 0o600)
+            return key
+    
+    def _load_integrity_chain(self):
+        """Load existing integrity chain from disk."""
+        chain_file = self.audit_dir / ".integrity_chain.json"
+        if chain_file.exists():
+            try:
+                with open(chain_file, "r") as f:
+                    self._integrity_chain = json.load(f)
+            except:
+                self._integrity_chain = {}
+    
+    def _save_integrity_chain(self):
+        """Save integrity chain to disk."""
+        chain_file = self.audit_dir / ".integrity_chain.json"
+        with open(chain_file, "w") as f:
+            json.dump(self._integrity_chain, f, indent=2)
+    
+    def _compute_hash(self, data: Dict) -> str:
+        """Compute SHA-256 hash of data."""
+        data_str = json.dumps(data, sort_keys=True).encode()
+        return hashlib.sha256(data_str).hexdigest()
+    
+    def _compute_hmac(self, data: Dict, previous_hash: str = "") -> str:
+        """Compute HMAC-SHA256 for data integrity with chaining."""
+        # Include previous hash for chain integrity (blockchain-like)
+        data_with_chain = {
+            "data": data,
+            "previous_hash": previous_hash
+        }
+        data_str = json.dumps(data_with_chain, sort_keys=True).encode()
+        return hmac.new(self._integrity_key, data_str, hashlib.sha256).hexdigest()
+    
+    def _verify_entry_integrity(self, entry: Dict, stored_hmac: str, previous_hash: str = "") -> bool:
+        """Verify integrity of a single audit entry."""
+        computed_hmac = self._compute_hmac(entry, previous_hash)
+        return hmac.compare_digest(computed_hmac, stored_hmac)
+    
+    def verify_audit_log_integrity(self, request_id: str) -> Dict[str, Any]:
+        """Verify integrity of an audit log entry.
+        
+        Returns:
+            Dict with verification results including:
+            - valid: bool indicating if integrity is intact
+            - tampered: bool indicating if tampering was detected
+            - details: additional information about verification
+        """
+        result = {
+            "request_id": request_id,
+            "valid": False,
+            "tampered": False,
+            "details": ""
+        }
+        
+        # Try to load from disk first
+        audit_file = self.audit_dir / f"{request_id}.json"
+        if not audit_file.exists():
+            # Check in-memory
+            if request_id not in self.audit_trail:
+                result["details"] = "Audit log entry not found"
+                return result
+            entry = self.audit_trail[request_id]
+        else:
+            try:
+                with open(audit_file, "r") as f:
+                    entry = json.load(f)
+            except Exception as e:
+                result["tampered"] = True
+                result["details"] = f"Failed to load audit log: {str(e)}"
+                return result
+        
+        # Get stored HMAC and previous hash
+        stored_hmac = entry.get("_integrity_hmac")
+        previous_hash = entry.get("_previous_hash", "")
+        
+        if not stored_hmac:
+            result["details"] = "No integrity HMAC found - log may be from before integrity protection was enabled"
+            return result
+        
+        # Verify the entry
+        # Create a copy without the HMAC for verification
+        entry_copy = {k: v for k, v in entry.items() if k not in ["_integrity_hmac", "_previous_hash"]}
+        
+        if not self._verify_entry_integrity(entry_copy, stored_hmac, previous_hash):
+            result["tampered"] = True
+            result["details"] = "HMAC verification failed - audit log has been tampered with!"
+            return result
+        
+        # Verify chain integrity if not the first entry
+        if previous_hash and request_id in self._integrity_chain:
+            expected_previous = self._integrity_chain.get(request_id, {}).get("entry_hash")
+            if expected_previous and expected_previous != previous_hash:
+                result["tampered"] = True
+                result["details"] = "Chain integrity broken - previous entry hash mismatch!"
+                return result
+        
+        result["valid"] = True
+        result["details"] = "Audit log integrity verified successfully"
+        return result
+    
+    def verify_all_audit_logs(self) -> Dict[str, Any]:
+        """Verify integrity of all audit logs.
+        
+        Returns:
+            Dict with summary of verification results
+        """
+        results = {
+            "total_logs": 0,
+            "valid_logs": 0,
+            "tampered_logs": 0,
+            "missing_hmac": 0,
+            "tampered_details": []
+        }
+        
+        # Check all audit log files
+        for audit_file in self.audit_dir.glob("REQ-*.json"):
+            request_id = audit_file.stem
+            results["total_logs"] += 1
+            
+            verification = self.verify_audit_log_integrity(request_id)
+            
+            if verification["valid"]:
+                results["valid_logs"] += 1
+            elif verification["tampered"]:
+                results["tampered_logs"] += 1
+                results["tampered_details"].append({
+                    "request_id": request_id,
+                    "details": verification["details"]
+                })
+            else:
+                results["missing_hmac"] += 1
+        
+        results["integrity_status"] = "COMPROMISED" if results["tampered_logs"] > 0 else "INTACT"
+        return results
     
     def start_request(self, request: Dict, user: Dict) -> str:
         """Start audit trail for a request"""
@@ -797,13 +953,41 @@ class EnterpriseAuditLogger:
         self.audit_trail[request_id]["events"].append(event)
     
     def _persist_request(self, request_id: str):
-        """Persist audit trail to disk"""
+        """Persist audit trail to disk with integrity protection"""
         if request_id not in self.audit_trail:
             return
         
+        # Get previous hash for chain integrity
+        previous_hash = ""
+        if self._integrity_chain:
+            # Get the last entry's hash as previous
+            last_request_id = list(self._integrity_chain.keys())[-1]
+            previous_hash = self._integrity_chain[last_request_id].get("entry_hash", "")
+        
+        # Create a copy of the audit record without integrity fields
+        audit_record = {k: v for k, v in self.audit_trail[request_id].items() 
+                       if k not in ["_integrity_hmac", "_previous_hash"]}
+        
+        # Compute HMAC for integrity protection
+        integrity_hmac = self._compute_hmac(audit_record, previous_hash)
+        entry_hash = self._compute_hash(audit_record)
+        
+        # Add integrity fields to the record
+        audit_record["_integrity_hmac"] = integrity_hmac
+        audit_record["_previous_hash"] = previous_hash
+        
+        # Save to disk
         audit_file = self.audit_dir / f"{request_id}.json"
         with open(audit_file, "w") as f:
-            json.dump(self.audit_trail[request_id], f, indent=2)
+            json.dump(audit_record, f, indent=2)
+        
+        # Update integrity chain
+        self._integrity_chain[request_id] = {
+            "entry_hash": entry_hash,
+            "previous_hash": previous_hash,
+            "timestamp": datetime.now().isoformat()
+        }
+        self._save_integrity_chain()
     
     def _matches_filters(self, record: Dict, filters: Dict) -> bool:
         """Check if record matches search filters"""

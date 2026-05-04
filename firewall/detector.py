@@ -31,6 +31,11 @@ class ModelFirewall:
         self.policy = policy or AdaptiveFirewallPolicy()
         self.history = []
         self.threat_signatures = self._load_threat_signatures()
+        # Adaptive threshold statistics per model type
+        self.threshold_stats = {
+            "default": {"mean": 0.0, "std": 1.0, "abs_max_threshold": None},
+        }
+        self._calibration_samples = []
         
     def evaluate(self, request: Dict[str, Any]) -> FirewallResult:
         """Evaluate a request against all firewall checks"""
@@ -102,15 +107,16 @@ class ModelFirewall:
                     details={"check": "input_sanity", "dimensions": tensor.dim()}
                 )
             
-            # Check value range (normalized data should be in reasonable range)
+            # Check value range using adaptive threshold based on model-specific statistics
             abs_max = tensor.abs().max().item()
-            if abs_max > 10.0:  # Arbitrary threshold - adjust based on model
+            threshold = self._get_adaptive_threshold("abs_max")
+            if abs_max > threshold:
                 return FirewallResult(
                     allowed=False,
                     action=FirewallAction.BLOCK,
-                    reason=f"Input values out of range (max abs: {abs_max:.2f})",
-                    confidence=0.8,
-                    details={"check": "input_sanity", "abs_max": abs_max}
+                    reason=f"Input values out of range (max abs: {abs_max:.2f}, threshold: {threshold:.2f})",
+                    confidence=0.85,
+                    details={"check": "input_sanity", "abs_max": abs_max, "threshold": threshold}
                 )
             
             # Check for NaN/Inf
@@ -503,6 +509,75 @@ class ModelFirewall:
                     return True
         
         return False
+    
+    def _get_adaptive_threshold(self, metric_name: str, model_type: str = "default") -> float:
+        """Get adaptive threshold based on model-specific statistics.
+        
+        Uses statistical analysis of calibration data to set dynamic thresholds
+        that adapt to the specific model's input distribution characteristics.
+        """
+        # If we have calibration samples, use them to calculate adaptive threshold
+        if self._calibration_samples and len(self._calibration_samples) >= 10:
+            samples = np.array(self._calibration_samples)
+            
+            if metric_name == "abs_max":
+                # Calculate percentile-based threshold (99th percentile + safety margin)
+                abs_max_values = np.max(np.abs(samples), axis=1)
+                p99 = np.percentile(abs_max_values, 99)
+                p95 = np.percentile(abs_max_values, 95)
+                # Use 3-sigma rule: threshold = mean + 3*std, but bounded by percentiles
+                mean_val = np.mean(abs_max_values)
+                std_val = np.std(abs_max_values)
+                sigma_threshold = mean_val + 3 * std_val
+                # Take minimum of sigma-based and percentile-based for robustness
+                return min(sigma_threshold, p99 * 1.2)
+        
+        # Fallback to model-type specific defaults if available
+        if model_type in self.threshold_stats:
+            stats = self.threshold_stats[model_type]
+            if stats.get("abs_max_threshold") is not None:
+                return stats["abs_max_threshold"]
+        
+        # Default safe threshold when no calibration data available
+        # Based on typical normalized input ranges [-3, 3] for most models
+        return 6.0
+    
+    def calibrate_thresholds(self, sample_inputs: List[np.ndarray], model_type: str = "default"):
+        """Calibrate adaptive thresholds using sample inputs.
+        
+        Args:
+            sample_inputs: List of representative input arrays from normal operation
+            model_type: Identifier for the model type being calibrated
+        """
+        if not sample_inputs:
+            return
+        
+        self._calibration_samples = []
+        for sample in sample_inputs:
+            if hasattr(sample, 'flatten'):
+                flat = sample.flatten()
+            else:
+                flat = np.array(sample).flatten()
+            self._calibration_samples.append(flat)
+        
+        # Calculate and store adaptive thresholds
+        abs_max_values = [np.max(np.abs(s)) for s in self._calibration_samples]
+        p99 = np.percentile(abs_max_values, 99)
+        p95 = np.percentile(abs_max_values, 95)
+        mean_val = np.mean(abs_max_values)
+        std_val = np.std(abs_max_values)
+        sigma_threshold = mean_val + 3 * std_val
+        
+        adaptive_threshold = min(sigma_threshold, p99 * 1.2)
+        
+        self.threshold_stats[model_type] = {
+            "mean": mean_val,
+            "std": std_val,
+            "abs_max_threshold": adaptive_threshold,
+            "p95": p95,
+            "p99": p99,
+            "sample_count": len(sample_inputs)
+        }
     
     def _detect_adversarial_patterns(self, data: np.ndarray, mean: float, std: float) -> List[str]:
         """Detect common adversarial attack patterns"""
