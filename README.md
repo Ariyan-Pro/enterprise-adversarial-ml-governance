@@ -42,7 +42,7 @@ The **Enterprise Adversarial ML Governance Engine v5.0 LTS** is a planet-scale a
 - **99.0% clean accuracy** preserved under full governance
 - **96.6–99.0% robustness** across FGSM, PGD, DeepFool, and C&W L₂ attacks
 - **5ms p99 cached inference** with full audit trail
-- **ISO 27001 · SOC 2 Type II · FedRAMP High · GDPR Art. 32 · SLSA Level 3** compliance baked in
+- **ISO 27001 · SOC 2 Type II · FedRAMP High · GDPR Art. 32 · SLSA Level 3** compliance self-assessment complete, ready for third-party audit ([evidence](./governance/compliance/evidence/))
 
 > Designed for ten-year survivability. See [`LTS_MANIFEST.md`](./LTS_MANIFEST.md).
 
@@ -76,7 +76,7 @@ The **Enterprise Adversarial ML Governance Engine v5.0 LTS** is a planet-scale a
 - **🧠 Autonomous Governance Core** — Async Python decision engine continuously evaluates attack telemetry, triggers defenses, rotates models, and logs every action with full audit chain.
 - **🗄️ 7-Table SQLite Memory Galaxy** — Structured governance memory: attack logs, defense state, model registry, compliance events, telemetry, alerts, and audit trails — all in WAL mode for concurrent access.
 - **📡 Cross-Domain Signalling Bus** — gRPC + Protobuf event bus connecting attack detection, defense orchestration, model registry, and compliance reporting with sub-millisecond inter-component latency.
-- **🏛️ Enterprise Compliance Matrix** — ISO 27001, SOC 2 Type II, FedRAMP High, GDPR Art. 32, OWASP ASVS 4.0, OpenSSF Scorecard, and SLSA Level 3 provenance — all addressable from a single compliance report.
+- **🏛️ Enterprise Compliance Matrix** — ISO 27001, SOC 2 Type II, FedRAMP High, GDPR Art. 32, OWASP ASVS 4.0, OpenSSF Scorecard, and SLSA Level 3 provenance — all addressable from a single compliance report ([self-assessment evidence](./governance/compliance/evidence/))
 - **🔐 Zero-Trust Security Posture** — mTLS pod-to-pod, OIDC + JWT RBAC, AES-256-GCM at rest, TLS 1.3 with PFS in transit, Sigstore cosign supply chain signatures, and CycloneDX SBOM.
 - **☸️ Kubernetes-Native Deployment** — Official Helm charts with Prometheus exporter, Grafana dashboards, and Alertmanager integration for production observability.
 
