@@ -42,7 +42,8 @@ The **Enterprise Adversarial ML Governance Engine v5.0 LTS** is a planet-scale a
 - **99.0% clean accuracy** preserved under full governance
 - **96.6–99.0% robustness** across FGSM, PGD, DeepFool, and C&W L₂ attacks
 - **5ms p99 cached inference** with full audit trail
-- **ISO 27001 · SOC 2 Type II · FedRAMP High · GDPR Art. 32 · SLSA Level 3** compliance self-assessment complete, ready for third-party audit ([evidence](./governance/compliance/evidence/))
+- **ISO 27001 · SOC 2 Type II · GDPR Art. 32 · SLSA Level 3** compliance self-assessment complete, ready for third-party audit ([evidence](./governance/compliance/evidence/))
+  - ⚠️ **FedRAMP High claim UNVERIFIED** - No JAB P-ATO found, no FedRAMP documentation package
 
 > Designed for ten-year survivability. See [`LTS_MANIFEST.md`](./LTS_MANIFEST.md).
 
@@ -76,7 +77,8 @@ The **Enterprise Adversarial ML Governance Engine v5.0 LTS** is a planet-scale a
 - **🧠 Autonomous Governance Core** — Async Python decision engine continuously evaluates attack telemetry, triggers defenses, rotates models, and logs every action with full audit chain.
 - **🗄️ 7-Table SQLite Memory Galaxy** — Structured governance memory: attack logs, defense state, model registry, compliance events, telemetry, alerts, and audit trails — all in WAL mode for concurrent access.
 - **📡 Cross-Domain Signalling Bus** — gRPC + Protobuf event bus connecting attack detection, defense orchestration, model registry, and compliance reporting with sub-millisecond inter-component latency.
-- **🏛️ Enterprise Compliance Matrix** — ISO 27001, SOC 2 Type II, FedRAMP High, GDPR Art. 32, OWASP ASVS 4.0, OpenSSF Scorecard, and SLSA Level 3 provenance — all addressable from a single compliance report ([self-assessment evidence](./governance/compliance/evidence/))
+- **🏛️ Enterprise Compliance Matrix** — ISO 27001, SOC 2 Type II, GDPR Art. 32, OWASP ASVS 4.0, OpenSSF Scorecard, and SLSA Level 3 provenance — all addressable from a single compliance report ([self-assessment evidence](./governance/compliance/evidence/))
+  - ⚠️ **FedRAMP High: UNVERIFIED** - No JAB P-ATO found, no FedRAMP documentation package
 - **🔐 Zero-Trust Security Posture** — mTLS pod-to-pod, OIDC + JWT RBAC, AES-256-GCM at rest, TLS 1.3 with PFS in transit, Sigstore cosign supply chain signatures, and CycloneDX SBOM.
 - **☸️ Kubernetes-Native Deployment** — Official Helm charts with Prometheus exporter, Grafana dashboards, and Alertmanager integration for production observability.
 
@@ -121,7 +123,7 @@ graph TD
     subgraph COMP["✅ Compliance"]
         DB --> ISO[ISO 27001]
         DB --> SOC[SOC 2 Type II]
-        BUS --> FED[FedRAMP High]
+        BUS --> FED[FedRAMP High ❌ UNVERIFIED]
         TEL --> GDPR[GDPR Art. 32]
         FW --> OWASP[OWASP ASVS 4.0]
         MR --> OSSF[OpenSSF Scorecard]
@@ -190,7 +192,7 @@ graph LR
 
     CORE -->|"ISO 27001"| C1([✅ ISO 27001])
     DB   -->|"SOC 2 Type II"| C2([✅ SOC 2 Type II])
-    BUS  -->|"FedRAMP High"| C3([✅ FedRAMP High])
+    BUS  -->|"FedRAMP High"| C3([❌ FedRAMP High - UNVERIFIED])
     TEL  -->|"GDPR Art. 32"| C4([✅ GDPR Art. 32])
     FW   -->|"OWASP ASVS 4.0"| C5([✅ OWASP ASVS 4.0])
     REG  -->|"OpenSSF Scorecard"| C6([✅ OpenSSF Scorecard])
@@ -198,7 +200,7 @@ graph LR
 
     style C1 fill:#238636,color:#fff
     style C2 fill:#238636,color:#fff
-    style C3 fill:#238636,color:#fff
+    style C3 fill:#d73a49,color:#fff
     style C4 fill:#238636,color:#fff
     style C5 fill:#238636,color:#fff
     style C6 fill:#238636,color:#fff
@@ -474,7 +476,7 @@ Invoke-Item charts/compliance_radar.png
 import matplotlib.pyplot as plt
 import numpy as np
 
-standards = ['ISO 27001', 'SOC 2\nType II', 'FedRAMP\nHigh',
+standards = ['ISO 27001', 'SOC 2\nType II', 'FedRAMP\nHigh ❌ UNVERIFIED',
              'GDPR\nArt. 32', 'OWASP\nASVS 4.0', 'OpenSSF\nScorecard', 'SLSA\nLevel 3']
 scores = [95, 95, 90, 92, 94, 88, 100]  # self-assessed coverage %
 
@@ -601,7 +603,7 @@ print("Saved: charts/attack_coverage_matrix.png")
 |:----------|:-----------|:---------|:-------|
 | Autonomous Core | Python 3.12, AsyncIO | ISO 27001 | ✅ |
 | Memory Galaxy | SQLite 3.45, WAL mode | SOC 2 Type II | ✅ |
-| Signalling Bus | gRPC + Protobuf | FedRAMP High | ✅ |
+| Signalling Bus | gRPC + Protobuf | FedRAMP High | ❌ UNVERIFIED |
 | Telemetry | Parquet + SHA-256 | GDPR Art. 32 | ✅ |
 | Firewall | FastAPI + Starlette | OWASP ASVS 4.0 | ✅ |
 | Registry | Hugging Face Hub | OpenSSF Scorecard | ✅ |
