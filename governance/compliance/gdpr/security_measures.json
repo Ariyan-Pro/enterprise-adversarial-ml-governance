@@ -1,0 +1,102 @@
+{
+  "SEC-001": {
+    "measure_id": "SEC-001",
+    "measure_type": "technical",
+    "category": "encryption",
+    "description": "AES-256 encryption for personal data at rest with integrity verification",
+    "implementation_status": "implemented",
+    "effectiveness_rating": 0.95,
+    "last_tested": "2026-05-05T16:36:27.006320",
+    "compliance_article": "Article 32"
+  },
+  "SEC-002": {
+    "measure_id": "SEC-002",
+    "measure_type": "technical",
+    "category": "encryption",
+    "description": "TLS 1.3 encryption for data in transit with integrity checks",
+    "implementation_status": "implemented",
+    "effectiveness_rating": 0.98,
+    "last_tested": "2026-05-05T16:36:27.006320",
+    "compliance_article": "Article 32"
+  },
+  "SEC-003": {
+    "measure_id": "SEC-003",
+    "measure_type": "technical",
+    "category": "pseudonymization",
+    "description": "SHA-256 based pseudonymization for identifiers with integrity protection",
+    "implementation_status": "implemented",
+    "effectiveness_rating": 0.85,
+    "last_tested": "2026-05-05T16:36:27.006320",
+    "compliance_article": "Article 32"
+  },
+  "SEC-004": {
+    "measure_id": "SEC-004",
+    "measure_type": "technical",
+    "category": "access_control",
+    "description": "Role-based access control with MFA and integrity monitoring",
+    "implementation_status": "implemented",
+    "effectiveness_rating": 0.9,
+    "last_tested": "2026-05-05T16:36:27.006320",
+    "compliance_article": "Article 32"
+  },
+  "SEC-005": {
+    "measure_id": "SEC-005",
+    "measure_type": "technical",
+    "category": "availability",
+    "description": "Automated backup with 24-hour RTO and integrity verification",
+    "implementation_status": "implemented",
+    "effectiveness_rating": 0.92,
+    "last_tested": "2026-05-05T16:36:27.006320",
+    "compliance_article": "Article 32"
+  },
+  "SEC-006": {
+    "measure_id": "SEC-006",
+    "measure_type": "technical",
+    "category": "availability",
+    "description": "System redundancy and failover capability with resilience testing",
+    "implementation_status": "implemented",
+    "effectiveness_rating": 0.88,
+    "last_tested": "2026-05-05T16:36:27.006320",
+    "compliance_article": "Article 32"
+  },
+  "SEC-007": {
+    "measure_id": "SEC-007",
+    "measure_type": "organizational",
+    "category": "access_control",
+    "description": "Staff training on data protection and integrity procedures",
+    "implementation_status": "implemented",
+    "effectiveness_rating": 0.8,
+    "last_tested": "2026-05-05T16:36:27.006320",
+    "compliance_article": "Article 32"
+  },
+  "SEC-008": {
+    "measure_id": "SEC-008",
+    "measure_type": "organizational",
+    "category": "encryption",
+    "description": "Key management policy and procedures with regular rotation",
+    "implementation_status": "implemented",
+    "effectiveness_rating": 0.85,
+    "last_tested": "2026-05-05T16:36:27.006320",
+    "compliance_article": "Article 32"
+  },
+  "SEC-009": {
+    "measure_id": "SEC-009",
+    "measure_type": "technical",
+    "category": "access_control",
+    "description": "Audit logging of all data access with tamper-proof integrity",
+    "implementation_status": "implemented",
+    "effectiveness_rating": 0.9,
+    "last_tested": "2026-05-05T16:36:27.006320",
+    "compliance_article": "Article 32"
+  },
+  "SEC-010": {
+    "measure_id": "SEC-010",
+    "measure_type": "organizational",
+    "category": "availability",
+    "description": "Incident response and data restoration procedures with resilience planning",
+    "implementation_status": "implemented",
+    "effectiveness_rating": 0.87,
+    "last_tested": "2026-05-05T16:36:27.006320",
+    "compliance_article": "Article 32"
+  }
+}

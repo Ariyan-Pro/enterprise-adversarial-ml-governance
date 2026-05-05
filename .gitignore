@@ -1,48 +1,57 @@
-# Logs and temp files
-*.log
+```
+# Sensitive data and keys
+governance/compliance/gdpr/encryption_keys/*.key
+
+# Temporary and cache files
 *.tmp
-*.swp
+*.temp
+*.cache
+
+# Logs
+*.log
 
 # Environment files
 .env
 .env.local
 *.env.*
 
-# Dependencies
-node_modules/
-venv/
-.venv/
-__pycache__/
-.mypy_cache/
-.pytest_cache/
-dist/
-build/
-target/
-.gradle/
-
-# Editors
+# IDE and editor files
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# System files
+# OS files
 .DS_Store
 Thumbs.db
 
-# Compiled files
+# Python specific
+__pycache__/
 *.pyc
-*.class
-*.o
-*.exe
-*.dll
+*.pyo
+*.pyd
+.Python
 *.so
-*.a
-*.obj
-*.out
 
-# Coverage
+# Build and distribution
+dist/
+build/
+*.egg-info/
+
+# Dependencies
+.venv/
+venv/
+.env/
+node_modules/
+
+# Coverage reports
 coverage/
 htmlcov/
 .coverage
+
+# Test files
+*.pytest_cache/
+.mypy_cache/
 
 # Compressed files
 *.zip
@@ -63,7 +72,4 @@ htmlcov/
 *.Z
 *.lz
 *.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
+```

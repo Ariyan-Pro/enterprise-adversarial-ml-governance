@@ -1,0 +1,31 @@
+{
+  "dpa_id": "DPA-20260505-001",
+  "controller_name": "Example Corp",
+  "processor_name": "Cloud Services Inc",
+  "processing_purposes": [
+    "Service delivery",
+    "Security monitoring"
+  ],
+  "data_categories": [
+    "Personal identifiers",
+    "Usage data"
+  ],
+  "data_subject_categories": [
+    "Customers",
+    "Website visitors"
+  ],
+  "retention_period_days": 365,
+  "security_measures": [
+    "Encryption",
+    "Access control",
+    "Audit logging"
+  ],
+  "sub_processors": [],
+  "international_transfers": false,
+  "transfer_mechanisms": [],
+  "audit_rights": true,
+  "breach_notification_hours": 72,
+  "signed_date": "2026-05-05T16:36:33.026225",
+  "expiry_date": "2027-05-05T16:36:33.026235",
+  "status": "draft"
+}

@@ -1,0 +1,31 @@
+{
+  "pia_id": "PIA-20260505-002",
+  "project_name": "Test Project",
+  "description": "Test processing",
+  "data_processing_operations": [
+    {
+      "op": "test"
+    }
+  ],
+  "necessity_assessment": "Necessary",
+  "proportionality_assessment": "Proportional",
+  "risk_to_rights_freedoms": [
+    {
+      "risk": "test",
+      "severity_score": 2
+    }
+  ],
+  "mitigation_measures": [
+    {
+      "measure": "test",
+      "effectiveness_score": 2
+    }
+  ],
+  "residual_risk_level": "low",
+  "dpo_consulted": true,
+  "stakeholder_consultation": [],
+  "approval_status": "pending",
+  "reviewed_by": null,
+  "review_date": null,
+  "next_review_date": null
+}

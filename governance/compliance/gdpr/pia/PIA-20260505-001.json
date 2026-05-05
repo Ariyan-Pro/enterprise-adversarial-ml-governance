@@ -1,0 +1,40 @@
+{
+  "pia_id": "PIA-20260505-001",
+  "project_name": "Telemetry Collection System",
+  "description": "Collection and analysis of security telemetry data",
+  "data_processing_operations": [
+    {
+      "operation": "Collection",
+      "purpose": "Security monitoring"
+    },
+    {
+      "operation": "Storage",
+      "purpose": "Threat analysis"
+    }
+  ],
+  "necessity_assessment": "Required for security threat detection",
+  "proportionality_assessment": "Limited to security-relevant data only",
+  "risk_to_rights_freedoms": [
+    {
+      "risk": "Potential identification",
+      "severity_score": 3
+    }
+  ],
+  "mitigation_measures": [
+    {
+      "measure": "Pseudonymization",
+      "effectiveness_score": 2
+    },
+    {
+      "measure": "Encryption",
+      "effectiveness_score": 2
+    }
+  ],
+  "residual_risk_level": "low",
+  "dpo_consulted": true,
+  "stakeholder_consultation": [],
+  "approval_status": "pending",
+  "reviewed_by": null,
+  "review_date": null,
+  "next_review_date": null
+}
