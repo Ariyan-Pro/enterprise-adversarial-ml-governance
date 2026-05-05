@@ -1,45 +1,43 @@
-# Compliance and governance documents
-governance/compliance/evidence/*.md
-
-# Logs and temporary files
+# Logs and temp files
 *.log
 *.tmp
 *.swp
 
-# Environment variables
+# Environment files
 .env
 .env.local
 *.env.*
 
-# Editors and IDEs
-.vscode/
-.idea/
-
 # Dependencies
 node_modules/
+venv/
+.venv/
 __pycache__/
 .mypy_cache/
 .pytest_cache/
-venv/
-.venv/
-
-# Build artifacts
 dist/
 build/
 target/
+.gradle/
+
+# Editors
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Compiled files
 *.pyc
 *.class
 *.o
-*.obj
 *.exe
 *.dll
 *.so
 *.a
+*.obj
 *.out
-
-# OS specific
-.DS_Store
-Thumbs.db
 
 # Coverage
 coverage/
