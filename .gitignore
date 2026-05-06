@@ -1,47 +1,44 @@
-```
-# CI/CD and workflow files
-.github/
-
-# Logs and temporary files
-*.log
-*.tmp
-
-# Environment variables
+# Environment
 .env
 .env.local
 *.env.*
 
-# Editor/IDE files
-.vscode/
-.idea/
+# Logs and temp files
+*.log
+*.tmp
 *.swp
-*.swo
+
+# Editors
+.vscode/
 
 # Dependencies
 node_modules/
-venv/
 .venv/
+venv/
 __pycache__/
 .mypy_cache/
 .pytest_cache/
-.julia/
-zig*/
-
-# Build artifacts
 dist/
 build/
 target/
+.gradle/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Compiled files
 *.pyc
 *.class
 *.o
-*.obj
 *.exe
 *.dll
 *.so
 *.a
+*.obj
 *.out
 
-# Coverage reports
+# Coverage
 coverage/
 htmlcov/
 .coverage
@@ -69,8 +66,3 @@ htmlcov/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-
-# System files
-.DS_Store
-Thumbs.db
-```
