@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
 from enum import Enum
+from collections import defaultdict
 import hashlib
 
 class RiskLevel(Enum):

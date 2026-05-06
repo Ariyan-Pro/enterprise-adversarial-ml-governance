@@ -178,7 +178,7 @@ def verify_timing_attack_resistance():
     try:
         import hmac
         
-        correct_secret = "correct_secret_key_12345"
+        correct_secret = "correct_secret_key_12345"  # nosec B105 - Test secret for verification
         attacker_guesses = [
             "wrong_secret_key_12345",
             "correct_secret_key_12344",

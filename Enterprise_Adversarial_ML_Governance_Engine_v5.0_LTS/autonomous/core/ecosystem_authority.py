@@ -694,8 +694,8 @@ class EcosystemAuthorityEngine(DatabaseAwareEngine):
         if "domain" in context:
             try:
                 domains.add(DomainType(context["domain"]))
-            except:
-                pass
+            except Exception:
+                pass  # Ignore invalid domain types - nosec B110
         
         # Check for model references
         if "model_id" in context:

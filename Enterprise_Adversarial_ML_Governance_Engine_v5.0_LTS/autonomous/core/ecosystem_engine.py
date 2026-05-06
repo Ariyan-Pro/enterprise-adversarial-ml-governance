@@ -183,8 +183,9 @@ class EcosystemAuthorityEngine(DatabaseAwareEngine):
                     # Determine propagation path
                     propagation_path = self._determine_propagation_path(threats)
                     
+                    # Generate threat ID using secure hash (not for security - nosec B324)
                     cross_threat = CrossDomainThreat(
-                        threat_id=f"cdt_{hashlib.md5(signature.encode()).hexdigest()[:16]}",
+                        threat_id=f"cdt_{hashlib.md5(signature.encode(), usedforsecurity=False).hexdigest()[:16]}",
                         pattern_signature=signature,
                         affected_domains=list(domains),
                         domain_severity_scores=severity_scores,

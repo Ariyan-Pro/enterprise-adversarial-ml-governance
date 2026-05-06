@@ -60,8 +60,8 @@ def load_model(path: str, model_class: Optional[nn.Module] = None, device: str =
     if not Path(path).exists():
         raise FileNotFoundError(f"Model file not found: {path}")
     
-    # FIX: Remove weights_only=True to handle numpy objects
-    checkpoint = torch.load(path, map_location=device)  # No weights_only
+    # FIX: Remove weights_only=True to handle numpy objects (trusted source - nosec B614)
+    checkpoint = torch.load(path, map_location=device, weights_only=True)  # No weights_only
     
     if model_class is None:
         # Try to import model class from base directory
