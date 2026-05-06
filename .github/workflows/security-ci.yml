@@ -19,10 +19,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.10'
 
@@ -45,12 +45,12 @@ jobs:
 
       - name: Check Dependencies for Vulnerabilities (Safety)
         run: |
-          safety check --json > safety-report.json || true
+          safety check --json > safety-report.json || echo '{}' > safety-report.json
           safety check || true
 
       - name: Audit Python Packages (pip-audit)
         run: |
-          pip-audit --format json > pip-audit-report.json || true
+          pip-audit --format json > pip-audit-report.json || echo '[]' > pip-audit-report.json
           pip-audit || true
 
       - name: Upload Security Reports
@@ -68,10 +68,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.10'
 
@@ -101,7 +101,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check requirements.txt for pinned versions
         run: |
@@ -129,12 +129,12 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
