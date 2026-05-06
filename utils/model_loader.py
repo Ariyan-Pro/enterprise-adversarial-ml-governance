@@ -22,8 +22,8 @@ def load_model_weights(model: nn.Module, model_path: str) -> bool:
             print(f"Model file not found: {model_path}")
             return False
         
-        # Load checkpoint
-        checkpoint = torch.load(model_path, map_location='cpu')
+        # Load checkpoint (trusted source - nosec B614)
+        checkpoint = torch.load(model_path, map_location='cpu', weights_only=True)
         
         # Handle different checkpoint formats
         if isinstance(checkpoint, dict):
@@ -46,7 +46,7 @@ def load_model_weights(model: nn.Module, model_path: str) -> bool:
                     model.load_state_dict(checkpoint)
                     print(f"Loaded model from state dict")
                     return True
-                except:
+                except Exception:
                     # Try with strict=False
                     model.load_state_dict(checkpoint, strict=False)
                     print(f"Loaded model with strict=False (some keys missing)")
@@ -77,8 +77,8 @@ def load_model_with_flexibility(model: nn.Module, model_path: str) -> bool:
             print(f"Model file not found: {model_path}")
             return False
         
-        # Load checkpoint
-        checkpoint = torch.load(model_path, map_location='cpu')
+        # Load checkpoint (trusted source - nosec B614)
+        checkpoint = torch.load(model_path, map_location='cpu', weights_only=True)
         
         # Get state dict
         if isinstance(checkpoint, dict) and 'state_dict' in checkpoint:

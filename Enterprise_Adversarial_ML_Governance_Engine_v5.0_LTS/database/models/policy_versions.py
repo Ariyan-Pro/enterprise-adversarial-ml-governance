@@ -183,7 +183,7 @@ class PolicyVersion(Base):
             })
             
             if current.previous_version:
-                current = session.query(cls).filter(cls.policy_id == current.previous_version).first()
+                current = session.query(PolicyVersion).filter(PolicyVersion.policy_id == current.previous_version).first()
             else:
                 break
         

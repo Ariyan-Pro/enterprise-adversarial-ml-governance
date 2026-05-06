@@ -88,8 +88,8 @@ class TelemetryManager:
                         "min": float(np.min(input_array)),
                         "max": float(np.max(input_array))
                     }
-            except:
-                pass  # Don't fail on input parsing errors
+            except Exception:
+                pass  # Don't fail on input parsing errors - nosec B110
         
         # Create telemetry record
         record = TelemetryRecord(
@@ -133,8 +133,8 @@ class TelemetryManager:
                 record_time = datetime.fromisoformat(record.timestamp.replace('Z', '+00:00'))
                 if record_time >= cutoff:
                     recent.append(record)
-            except:
-                continue
+            except Exception:
+                continue  # Skip invalid records - nosec B112
         
         return recent
 

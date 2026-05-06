@@ -3,6 +3,7 @@ Dataset Utilities - Bridge to new datasets module
 """
 import sys
 import os
+import torch
 sys.path.insert(0, os.path.abspath('.'))
 
 def load_mnist(data_dir="data/raw/mnist", cache=True, augment=False):

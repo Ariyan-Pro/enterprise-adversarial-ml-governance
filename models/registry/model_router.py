@@ -4,6 +4,7 @@ Supported simultaneously: vision, tabular, text classifiers
 """
 import json
 import yaml
+import numpy as np
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict
